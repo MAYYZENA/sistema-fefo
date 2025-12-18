@@ -2406,15 +2406,11 @@ function salvarConfiguracoes() {
 
 // ==================== COMPARTILHAMENTO ====================
 async function compartilharRelatorio(tipo) {
-  mostrarNotificacao('📊 Gerando relatório...', 'info');
+  mostrarToast('📊 Gerando relatório...', 'info');
   
   try {
     // Gerar dados do relatório
-    const q = query(
-      collection(db, `usuarios/${currentUser.uid}/estoque`),
-      orderBy('validade')
-    );
-    const snapshot = await getDocs(q);
+    const snapshot = await db.collection('estoque').get();
     
     const produtos = [];
     snapshot.forEach(doc => {
@@ -2425,18 +2421,18 @@ async function compartilharRelatorio(tipo) {
         marca: data.marca || '',
         categoria: data.categoria || '',
         quantidade: data.quantidade || 0,
-        validade: data.validade || ''
+        validade: data.dataValidade ? data.dataValidade.toDate() : null
       });
     });
     
     const hoje = new Date();
     const total = produtos.length;
-    const vencidos = produtos.filter(p => new Date(p.validade) < hoje).length;
+    const vencidos = produtos.filter(p => p.validade && p.validade < hoje).length;
     const proxVencer = produtos.filter(p => {
-      const val = new Date(p.validade);
+      if (!p.validade) return false;
       const dias7 = new Date(hoje);
       dias7.setDate(dias7.getDate() + 7);
-      return val >= hoje && val <= dias7;
+      return p.validade >= hoje && p.validade <= dias7;
     }).length;
     
     // Gerar mensagem
@@ -2446,58 +2442,93 @@ async function compartilharRelatorio(tipo) {
       `• Próximos a vencer: ${proxVencer}\n` +
       `• Vencidos: ${vencidos}\n\n` +
       `📅 Gerado em: ${hoje.toLocaleDateString('pt-BR')} às ${hoje.toLocaleTimeString('pt-BR')}\n\n` +
-      `🌐 Acesse o sistema: http://estoque-edin.netlify.app`;
+      `🌐 Acesse o sistema: https://mayyzena.github.io/sistema-fefo`;
     
     if (tipo === 'whatsapp') {
       // Compartilhar via WhatsApp
       const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(mensagem)}`;
       window.open(url, '_blank');
-      mostrarNotificacao('✅ Abrindo WhatsApp...', 'success');
+      mostrarToast('✅ Abrindo WhatsApp...', 'success');
     } else if (tipo === 'email') {
       // Compartilhar via Email
       const assunto = `Relatório de Estoque FEFO - ${hoje.toLocaleDateString('pt-BR')}`;
       const corpo = mensagem.replace(/\*/g, '').replace(/\n/g, '%0D%0A');
       const url = `mailto:?subject=${encodeURIComponent(assunto)}&body=${corpo}`;
       window.location.href = url;
-      mostrarNotificacao('✅ Abrindo cliente de email...', 'success');
+      mostrarToast('✅ Abrindo cliente de email...', 'success');
     }
   } catch (error) {
     console.error('Erro ao compartilhar relatório:', error);
-    mostrarNotificacao('❌ Erro ao compartilhar relatório', 'error');
+    mostrarToast('❌ Erro ao compartilhar relatório', 'error');
   }
 }
 
+window.compartilharRelatorio = compartilharRelatorio;
+
 // ==================== BACKUP ====================
 async function fazerBackup() {
-  mostrarNotificacao('💾 Gerando backup...', 'info');
+  mostrarToast('💾 Gerando backup...', 'info');
   
   try {
     const backup = {
       versao: '1.0',
       dataBackup: new Date().toISOString(),
-      usuario: currentUser.email,
+      usuario: usuarioAtual?.email || 'desconhecido',
       dados: {
         estoque: [],
         historico: [],
-        marcas: []
+        locais: []
       }
     };
     
     // Buscar estoque
-    const qEstoque = query(collection(db, `usuarios/${currentUser.uid}/estoque`));
-    const snapshotEstoque = await getDocs(qEstoque);
+    const snapshotEstoque = await db.collection('estoque').get();
     snapshotEstoque.forEach(doc => {
       backup.dados.estoque.push({ id: doc.id, ...doc.data() });
     });
     
     // Buscar histórico
-    const qHistorico = query(collection(db, `usuarios/${currentUser.uid}/historico`));
-    const snapshotHistorico = await getDocs(qHistorico);
+    const snapshotHistorico = await db.collection('historico').get();
     snapshotHistorico.forEach(doc => {
       backup.dados.historico.push({ id: doc.id, ...doc.data() });
     });
     
-    // Buscar marcas
+    // Buscar locais
+    const snapshotLocais = await db.collection('locais').get();
+    snapshotLocais.forEach(doc => {
+      backup.dados.locais.push({ id: doc.id, ...doc.data() });
+    });
+    
+    // Converter para JSON
+    const jsonStr = JSON.stringify(backup, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    // Download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup-fefo-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    mostrarToast('✅ Backup realizado com sucesso!', 'success');
+    
+    // Salvar último backup no localStorage
+    try {
+      localStorage.setItem('fefo-ultimo-backup', new Date().toISOString());
+    } catch(e) {
+      console.error('Erro ao salvar data do último backup:', e);
+    }
+  } catch (error) {
+    console.error('Erro ao fazer backup:', error);
+    mostrarToast('❌ Erro ao fazer backup', 'error');
+  }
+}
+
+window.fazerBackup = fazerBackup;
+window.solicitarPermissaoNotificacao = solicitarPermissaoNotificacao;
     const qMarcas = query(collection(db, `usuarios/${currentUser.uid}/marcas`));
     const snapshotMarcas = await getDocs(qMarcas);
     snapshotMarcas.forEach(doc => {
