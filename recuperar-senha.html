@@ -275,7 +275,7 @@
       } else if (error.code === 'auth/invalid-email') {
         mostrarAlerta('❌ Email inválido', 'error');
       } else if (error.code === 'auth/too-many-requests') {
-        mostrarAlerta('❌ Muitas tentativas. Aguarde alguns minutos.', 'error');
+        mostrarAlerta('🔒 Muitas tentativas detectadas.\n\n⏱️ Aguarde 15-30 minutos e tente novamente.\n\nIsso é uma proteção do Firebase contra uso excessivo.', 'error');
       } else {
         mostrarAlerta('❌ Erro ao enviar email. Tente novamente.', 'error');
       }
