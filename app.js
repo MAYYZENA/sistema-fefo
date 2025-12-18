@@ -109,13 +109,24 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   // ================ CONTROLE DE TELAS ================
   function abrir(id) {
     console.log('📂 Abrindo tela:', id);
-    document.querySelectorAll('.tela').forEach(t => t.classList.add('d-none'));
+    
+    // Esconde todas as telas
+    document.querySelectorAll('.tela').forEach(t => {
+      t.classList.add('d-none');
+      t.style.display = 'none';
+    });
+    
+    // Busca a tela
     const el = document.getElementById(id);
     if (!el) {
       console.error('❌ Tela não encontrada:', id);
+      alert(`Erro: Tela "${id}" não encontrada. Limpe o cache do navegador (Ctrl+Shift+Delete)`);
       return;
     }
+    
+    // Mostra a tela
     el.classList.remove('d-none');
+    el.style.display = 'block';
     console.log('✅ Tela aberta:', id);
 
     if (id === 'estoque') {
