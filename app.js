@@ -108,10 +108,15 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
 
   // ================ CONTROLE DE TELAS ================
   function abrir(id) {
+    console.log('📂 Abrindo tela:', id);
     document.querySelectorAll('.tela').forEach(t => t.classList.add('d-none'));
     const el = document.getElementById(id);
-    if (!el) return;
+    if (!el) {
+      console.error('❌ Tela não encontrada:', id);
+      return;
+    }
     el.classList.remove('d-none');
+    console.log('✅ Tela aberta:', id);
 
     if (id === 'estoque') {
       carregarEstoque();
@@ -128,10 +133,12 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     }
     
     if (id === 'locais') {
+      console.log('🔄 Carregando lista de locais...');
       listarLocais();
     }
     
     if (id === 'usuarios') {
+      console.log('🔄 Carregando lista de usuários...');
       listarUsuarios();
     }
     
