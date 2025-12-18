@@ -110,10 +110,11 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   function abrir(id) {
     console.log('📂 Abrindo tela:', id);
     
-    // Esconde todas as telas
+    // Esconde todas as telas (exceto login)
     document.querySelectorAll('.tela').forEach(t => {
-      t.classList.add('d-none');
-      t.style.display = 'none';
+      if (t.id !== 'login') {
+        t.style.display = 'none';
+      }
     });
     
     // Busca a tela
@@ -125,7 +126,6 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     }
     
     // Mostra a tela
-    el.classList.remove('d-none');
     el.style.display = 'block';
     console.log('✅ Tela aberta:', id);
     
