@@ -424,9 +424,11 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       });
       
       // Mostra modal para usuário escolher
+      mostrarLoader(false); // 🔧 DESLIGA O LOADER ANTES DE ABRIR O MODAL
       const produtoEscolhido = await mostrarModalEscolhaProduto(produtos, codigo);
       
       if (produtoEscolhido) {
+        mostrarLoader(true); // Liga loader para salvar
         // Atualiza o produto no catálogo com o código de barras
         await db.collection('catalogo-produtos').doc(produtoEscolhido.id).update({
           codigo: codigo
@@ -444,6 +446,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
           document.getElementById('fornecedorProduto').value = produtoEscolhido.fornecedor;
         }
         
+        mostrarLoader(false); // Desliga loader
         mostrarToast(`✅ Código ${codigo} associado a "${produtoEscolhido.nome}"!`);
         console.log('✅ Código associado com sucesso!');
         return true;
