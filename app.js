@@ -2007,6 +2007,80 @@ async function carregarMarcas() {
   select.disabled = false;
 }
 
+// ================= 🆕 MIGRAR CATÁLOGO PARA ESTOQUE =================
+async function migrarCatalogoParaEstoque() {
+  if (!confirm('⚠️ Isso vai adicionar TODOS os produtos do catálogo ao estoque com quantidade 0.\n\nDeseja continuar?')) {
+    return;
+  }
+  
+  try {
+    mostrarLoader(true);
+    console.log('🔄 Iniciando migração do catálogo para estoque...');
+    
+    // Busca todos os produtos do catálogo
+    const catalogoSnap = await db.collection('catalogo-produtos').get();
+    
+    if (catalogoSnap.empty) {
+      mostrarToast('⚠️ Catálogo vazio! Importe os produtos primeiro.');
+      mostrarLoader(false);
+      return;
+    }
+    
+    let adicionados = 0;
+    let jaExistiam = 0;
+    
+    for (const doc of catalogoSnap.docs) {
+      const produto = doc.data();
+      const codigo = produto.codigo || '';
+      
+      // Verifica se já existe no estoque com esse código
+      if (codigo) {
+        const estoqueSnap = await db.collection('estoque')
+          .where('codigo', '==', codigo)
+          .limit(1)
+          .get();
+        
+        if (!estoqueSnap.empty) {
+          jaExistiam++;
+          console.log(`⏭️ Produto já existe: ${produto.nome}`);
+          continue;
+        }
+      }
+      
+      // Adiciona ao estoque com quantidade 0
+      await db.collection('estoque').add({
+        codigo: codigo,
+        nome: produto.nome || '',
+        marca: produto.marca || '',
+        categoria: produto.categoria || '',
+        fornecedor: produto.fornecedor || '',
+        quantidade: 0,
+        lote: '',
+        validade: null,
+        dataEntrada: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      
+      adicionados++;
+      console.log(`✅ Adicionado: ${produto.nome}`);
+    }
+    
+    mostrarLoader(false);
+    mostrarToast(`✅ Migração concluída!\n📦 ${adicionados} produtos adicionados\n⏭️ ${jaExistiam} já existiam`);
+    console.log(`📊 Total: ${adicionados} novos, ${jaExistiam} já existentes`);
+    
+    // Atualiza a tela se estiver no dashboard
+    if (typeof atualizarMetricas === 'function') {
+      atualizarMetricas();
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro na migração:', error);
+    mostrarLoader(false);
+    mostrarToast('❌ Erro ao migrar catálogo: ' + error.message);
+  }
+}
+window.migrarCatalogoParaEstoque = migrarCatalogoParaEstoque;
+
 // ================= SCANNER DE CÓDIGO =================
 let scanner = null;
 // ================= SESSÃO =================
