@@ -324,86 +324,8 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
         return;
       }
       
-      // Se não encontrou na Open Food Facts, tenta na API do Cosmos
-      console.log('4️⃣ Produto não encontrado no Open Food Facts, tentando Cosmos...');
-      try {
-        response = await fetch(`https://api.cosmos.bluesoft.com.br/gtins/${codigo}.json`);
-        console.log('Resposta Cosmos status:', response.status);
-        if (response.ok) {
-          data = await response.json();
-          console.log('Dados Cosmos:', data);
-          
-          const nomeProduto = data.description || '';
-          const marca = data.brand?.name || '';
-          
-          // 🆕 BUSCA INTELIGENTE NO CATÁLOGO ANTES DE PREENCHER
-          if (nomeProduto) {
-            console.log('🧠 Tentando busca inteligente no catálogo (Cosmos)...');
-            const produtoInteligente = await buscarProdutoInteligenteNoCatalogo(nomeProduto, marca);
-            
-            if (produtoInteligente) {
-              // ENCONTROU! Preenche com dados do catálogo e associa o código
-              console.log('🎯 MATCH AUTOMÁTICO (Cosmos)!', produtoInteligente.nome);
-              document.getElementById('nomeProduto').value = produtoInteligente.nome;
-              
-              if (produtoInteligente.marca) {
-                document.getElementById('marcaProduto').value = produtoInteligente.marca;
-              }
-              if (produtoInteligente.categoria) {
-                document.getElementById('categoriaProduto').value = produtoInteligente.categoria;
-              }
-              if (produtoInteligente.fornecedor) {
-                document.getElementById('fornecedorProduto').value = produtoInteligente.fornecedor;
-              }
-              
-              // ASSOCIA O CÓDIGO DE BARRAS AO PRODUTO DO CATÁLOGO
-              await db.collection('catalogo-produtos').doc(produtoInteligente.id).update({ codigo });
-              console.log('✅ Código associado ao produto do catálogo!');
-              
-              mostrarLoader(false);
-              mostrarToast('✅ Produto encontrado e associado automaticamente!');
-              return;
-            }
-          }
-          
-          // Se não encontrou match inteligente, preenche com dados da API
-          if (nomeProduto) {
-            document.getElementById('nomeProduto').value = nomeProduto;
-            console.log('✅ Nome preenchido (Cosmos):', nomeProduto);
-          }
-          
-          if (marca) {
-            const selectMarca = document.getElementById('marcaProduto');
-            const opcoes = Array.from(selectMarca.options).map(opt => opt.value);
-            
-            let marcaEncontrada = opcoes.find(m => m.toLowerCase() === marca.toLowerCase());
-            
-            if (marcaEncontrada) {
-              selectMarca.value = marcaEncontrada;
-              console.log('✅ Marca preenchida (Cosmos):', marcaEncontrada);
-            } else {
-              console.log('⚠️ Marca não cadastrada (Cosmos):', marca);
-              if (confirm(`A marca "${marca}" não está cadastrada. Deseja adicionar?`)) {
-                await db.collection('marcas').add({ nome: marca });
-                await carregarMarcas();
-                selectMarca.value = marca;
-                console.log('✅ Marca adicionada e preenchida (Cosmos):', marca);
-              }
-            }
-          }
-          
-          mostrarLoader(false);
-          mostrarToast('✅ Produto encontrado no Cosmos!');
-          console.log('✅ Busca concluída com sucesso (Cosmos)!');
-          return;
-        }
-      } catch (cosmosError) {
-        // Erro do Cosmos (CORS, etc) - ignora e continua
-        console.log('⚠️ Cosmos API não disponível (CORS ou outro erro):', cosmosError.message);
-      }
-      
-      // Se não encontrou em nenhuma API
-      console.log('❌ Produto não encontrado em nenhuma base de dados');
+      // Se não encontrou na Open Food Facts
+      console.log('❌ Produto não encontrado nas APIs públicas');
       mostrarLoader(false);
       
       // 🆕 NOVA FUNCIONALIDADE: Buscar no catálogo e associar código
