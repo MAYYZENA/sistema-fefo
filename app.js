@@ -236,25 +236,34 @@ function getCollection(collectionName) {
       const userCredential = await auth.signInWithEmailAndPassword(email, senha);
       const user = userCredential.user;
       
+      console.log('👤 UID do usuário:', user.uid);
+      console.log('📧 Email do usuário:', user.email);
+      
       // Carregar dados da empresa
       const empresaDoc = await db.collection('usuarios').doc(user.uid).get();
+      console.log('📄 Documento existe?', empresaDoc.exists);
+      
       if (empresaDoc.exists) {
         empresaAtual = empresaDoc.data();
+        console.log('📦 Dados carregados do Firebase:', empresaAtual);
         usuarioAtual = {
           uid: user.uid,
           email: user.email,
           ...empresaAtual
         };
       } else {
+        console.log('⚠️ Documento não existe! Criando novo...');
         // Primeira vez - criar perfil básico
         empresaAtual = {
           nomeEmpresa: email.split('@')[0],
           email: email,
           dataCriacao: firebase.firestore.FieldValue.serverTimestamp(),
-          plano: 'gratuito'
+          plano: 'gratuito',
+          isAdmin: false  // Novo usuário não é admin por padrão
         };
         await db.collection('usuarios').doc(user.uid).set(empresaAtual);
         usuarioAtual = { uid: user.uid, email: user.email, ...empresaAtual };
+        console.log('✅ Novo documento criado:', empresaAtual);
       }
       
       // Esconder login
