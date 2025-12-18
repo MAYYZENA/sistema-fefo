@@ -36,6 +36,69 @@
   --radius-lg: 12px;
 }
 
+/* ==================== MODO ESCURO ==================== */
+body.dark {
+  --bg-main: #1a1a1a;
+  --bg-secondary: #121212;
+  --bg-card: #1e1e1e;
+  
+  --text-primary: #e8eaed;
+  --text-secondary: #9aa0a6;
+  --text-disabled: #5f6368;
+  
+  --border: #3c4043;
+  --border-light: #2d2e30;
+  
+  --sidebar-bg: #0d0d0d;
+  --sidebar-hover: #1f1f1f;
+}
+
+body.dark .card {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+body.dark .topbar {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+body.dark .form-control,
+body.dark .form-select,
+body.dark input,
+body.dark textarea,
+body.dark select {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+body.dark .btn-outline-secondary {
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+body.dark .btn-outline-secondary:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+body.dark table {
+  color: var(--text-primary);
+}
+
+body.dark table thead {
+  background: var(--bg-card);
+}
+
+body.dark table tbody tr {
+  border-color: var(--border);
+}
+
+body.dark table tbody tr:hover {
+  background: var(--sidebar-hover);
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
   background: var(--bg-secondary);

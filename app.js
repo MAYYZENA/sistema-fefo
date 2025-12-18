@@ -3621,6 +3621,10 @@ async function renderizarPerfil() {
   const plano = empresaAtual?.plano || 'gratuito';
   const nomeEmpresa = empresaAtual?.nomeEmpresa || 'Minha Empresa';
   const email = usuarioAtual?.email || '';
+  const telefone = empresaAtual?.telefone || '';
+  const endereco = empresaAtual?.endereco || '';
+  const cnpj = empresaAtual?.cnpj || '';
+  const responsavel = empresaAtual?.responsavel || '';
   
   let limite = 50;
   let nomePlano = '🆓 Gratuito';
@@ -3641,39 +3645,86 @@ async function renderizarPerfil() {
   secaoPerfil.innerHTML = `
     <div class="header-secao">
       <h2>🏢 Perfil da Empresa</h2>
+      <p style="color: #666; margin-top: 8px;">Gerencie as informações da sua empresa e configurações</p>
     </div>
     
-    <div class="card" style="max-width: 800px; margin: 0 auto;">
+    <div class="card" style="max-width: 900px; margin: 0 auto;">
       <!-- Informações da Empresa -->
-      <div style="padding: 24px; border-bottom: 1px solid #e0e0e0;">
-        <h3 style="margin-bottom: 16px;">📋 Informações</h3>
+      <div style="padding: 24px; border-bottom: 1px solid var(--border);">
+        <h3 style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+          📋 Informações da Empresa
+        </h3>
         
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; font-weight: 500; margin-bottom: 8px;">Nome da Empresa</label>
-          <input type="text" id="inputNomeEmpresa" value="${nomeEmpresa}" 
-                 style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div>
+            <label style="display: block; font-weight: 500; margin-bottom: 8px; color: var(--text-primary);">
+              Nome da Empresa *
+            </label>
+            <input type="text" id="inputNomeEmpresa" value="${nomeEmpresa}" 
+                   placeholder="Ex: Farmácia Central"
+                   style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg-main); color: var(--text-primary);">
+          </div>
+          
+          <div>
+            <label style="display: block; font-weight: 500; margin-bottom: 8px; color: var(--text-primary);">
+              Responsável
+            </label>
+            <input type="text" id="inputResponsavel" value="${responsavel}" 
+                   placeholder="Nome do responsável"
+                   style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg-main); color: var(--text-primary);">
+          </div>
+          
+          <div>
+            <label style="display: block; font-weight: 500; margin-bottom: 8px; color: var(--text-primary);">
+              Email
+            </label>
+            <input type="email" value="${email}" disabled
+                   style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg-secondary); color: var(--text-disabled); cursor: not-allowed;">
+            <small style="color: var(--text-secondary); font-size: 12px;">O email não pode ser alterado</small>
+          </div>
+          
+          <div>
+            <label style="display: block; font-weight: 500; margin-bottom: 8px; color: var(--text-primary);">
+              Telefone
+            </label>
+            <input type="tel" id="inputTelefone" value="${telefone}" 
+                   placeholder="(00) 00000-0000"
+                   style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg-main); color: var(--text-primary);">
+          </div>
+          
+          <div>
+            <label style="display: block; font-weight: 500; margin-bottom: 8px; color: var(--text-primary);">
+              CNPJ/CPF
+            </label>
+            <input type="text" id="inputCnpj" value="${cnpj}" 
+                   placeholder="00.000.000/0000-00"
+                   style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg-main); color: var(--text-primary);">
+          </div>
+          
+          <div>
+            <label style="display: block; font-weight: 500; margin-bottom: 8px; color: var(--text-primary);">
+              Endereço Completo
+            </label>
+            <input type="text" id="inputEndereco" value="${endereco}" 
+                   placeholder="Rua, número, bairro, cidade"
+                   style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg-main); color: var(--text-primary);">
+          </div>
         </div>
         
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; font-weight: 500; margin-bottom: 8px;">Email</label>
-          <input type="text" value="${email}" disabled
-                 style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #f5f5f5;">
-        </div>
-        
-        <button onclick="salvarPerfilEmpresa()" class="btn-primary" style="margin-top: 16px;">
+        <button onclick="salvarPerfilEmpresa()" class="btn-primary" style="margin-top: 20px; padding: 12px 24px; font-weight: 600;">
           💾 Salvar Alterações
         </button>
       </div>
       
       <!-- Plano Atual -->
-      <div style="padding: 24px; border-bottom: 1px solid #e0e0e0;">
-        <h3 style="margin-bottom: 16px;">💳 Plano Atual</h3>
+      <div style="padding: 24px; border-bottom: 1px solid var(--border);">
+        <h3 style="margin-bottom: 16px; color: var(--text-primary);">💳 Plano Atual</h3>
         
         <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
           <div style="flex: 1; padding: 16px; background: linear-gradient(135deg, ${corPlano}15 0%, ${corPlano}05 100%); 
                       border-left: 4px solid ${corPlano}; border-radius: 8px;">
             <div style="font-size: 24px; font-weight: 600; color: ${corPlano};">${nomePlano}</div>
-            <div style="color: #666; margin-top: 4px;">
+            <div style="color: var(--text-secondary); margin-top: 4px;">
               ${plano === 'profissional' ? 'Produtos ilimitados' : `Até ${limite} produtos`}
             </div>
           </div>
@@ -3682,12 +3733,12 @@ async function renderizarPerfil() {
         ${plano !== 'profissional' ? `
           <div style="margin-bottom: 16px;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="font-weight: 500;">Uso do Plano</span>
+              <span style="font-weight: 500; color: var(--text-primary);">Uso do Plano</span>
               <span style="font-weight: 600; color: ${porcentagemUso >= 90 ? '#f44336' : porcentagemUso >= 70 ? '#ff9800' : '#4CAF50'};">
                 ${totalProdutos} / ${limite} produtos (${porcentagemUso}%)
               </span>
             </div>
-            <div style="height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
+            <div style="height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden;">
               <div style="height: 100%; width: ${porcentagemUso}%; background: ${porcentagemUso >= 90 ? '#f44336' : porcentagemUso >= 70 ? '#ff9800' : '#4CAF50'}; 
                           transition: width 0.3s;"></div>
             </div>
@@ -3695,9 +3746,9 @@ async function renderizarPerfil() {
         ` : ''}
         
         ${plano === 'gratuito' ? `
-          <div style="padding: 16px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; margin-bottom: 16px;">
-            <div style="font-weight: 600; margin-bottom: 8px;">⭐ Faça upgrade e tenha:</div>
-            <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+          <div style="padding: 16px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px;">
+            <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">⭐ Faça upgrade e tenha:</div>
+            <ul style="margin: 0; padding-left: 20px; line-height: 1.8; color: var(--text-secondary);">
               <li><strong>Plano Básico (R$ 29,90/mês):</strong> Até 500 produtos</li>
               <li><strong>Plano Profissional (R$ 79,90/mês):</strong> Produtos ilimitados + Suporte prioritário</li>
             </ul>
@@ -3727,7 +3778,7 @@ async function renderizarPerfil() {
           🗑️ Excluir Conta e Todos os Dados
         </button>
         
-        <p style="margin-top: 12px; color: #666; font-size: 12px; text-align: center;">
+        <p style="margin-top: 12px; color: var(--text-secondary); font-size: 12px; text-align: center;">
           Esta ação é irreversível. Todos os seus dados serão permanentemente excluídos.
         </p>
       </div>
@@ -3738,16 +3789,48 @@ async function renderizarPerfil() {
 async function salvarPerfilEmpresa() {
   try {
     const novoNome = document.getElementById('inputNomeEmpresa').value.trim();
+    const novoResponsavel = document.getElementById('inputResponsavel')?.value.trim() || '';
+    const novoTelefone = document.getElementById('inputTelefone')?.value.trim() || '';
+    const novoCnpj = document.getElementById('inputCnpj')?.value.trim() || '';
+    const novoEndereco = document.getElementById('inputEndereco')?.value.trim() || '';
     
     if (!novoNome) {
       mostrarToast('❌ Nome da empresa não pode ficar vazio!', 'error');
       return;
     }
     
+    mostrarLoader(true);
+    
     // Atualizar no Firebase
     await db.collection('usuarios').doc(auth.currentUser.uid).update({
-      nomeEmpresa: novoNome
+      nomeEmpresa: novoNome,
+      responsavel: novoResponsavel,
+      telefone: novoTelefone,
+      cnpj: novoCnpj,
+      endereco: novoEndereco,
+      dataAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
     });
+    
+    // Atualizar variável global
+    empresaAtual.nomeEmpresa = novoNome;
+    empresaAtual.responsavel = novoResponsavel;
+    empresaAtual.telefone = novoTelefone;
+    empresaAtual.cnpj = novoCnpj;
+    empresaAtual.endereco = novoEndereco;
+    
+    // Atualizar nome no header
+    const nomeEmpresaEl = document.getElementById('nomeEmpresa');
+    if (nomeEmpresaEl) nomeEmpresaEl.textContent = novoNome;
+    
+    mostrarLoader(false);
+    mostrarToast('✅ Perfil atualizado com sucesso!', 'success');
+    
+  } catch (error) {
+    mostrarLoader(false);
+    console.error('Erro ao salvar perfil:', error);
+    mostrarToast('❌ Erro ao salvar. Tente novamente.', 'error');
+  }
+}
     
     // Atualizar variável global
     empresaAtual.nomeEmpresa = novoNome;
