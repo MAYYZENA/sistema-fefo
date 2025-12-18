@@ -3337,12 +3337,16 @@ window.atualizarMetricas = async function() {
     let total = 0;
     let proxVencer = 0;
     let vencidos = 0;
+    let valorTotal = 0;
     const hoje = new Date();
     const em7Dias = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000);
     
     snap.forEach(doc => {
       const p = doc.data();
       total++;
+      
+      // Calcular valor (simulado - em produção usar preço real)
+      valorTotal += (p.quantidade || 0) * 10; // R$ 10 por unidade (exemplo)
       
       if (p.dataValidade && p.dataValidade.toDate) {
         const dataValidade = p.dataValidade.toDate();
@@ -3354,26 +3358,324 @@ window.atualizarMetricas = async function() {
       }
     });
     
+    // Atualizar valores
     const elTotal = document.getElementById('totalProdutos');
     const elProx = document.getElementById('proxVencer');
     const elVenc = document.getElementById('vencidos');
+    const elValor = document.getElementById('valorTotal');
     
-    if (elTotal) elTotal.textContent = total;
-    if (elProx) elProx.textContent = proxVencer;
-    if (elVenc) elVenc.textContent = vencidos;
+    if (elTotal) elTotal.textContent = formatNumber(total);
+    if (elProx) elProx.textContent = formatNumber(proxVencer);
+    if (elVenc) elVenc.textContent = formatNumber(vencidos);
+    if (elValor) elValor.textContent = formatCurrency(valorTotal);
+    
+    // Calcular tendências (simulado - em produção comparar com período anterior)
+    const trendTotal = document.getElementById('trendTotal');
+    const trendProx = document.getElementById('trendProx');
+    const trendVenc = document.getElementById('trendVenc');
+    const trendValor = document.getElementById('trendValor');
+    
+    // Simular variações aleatórias
+    const varTotal = (Math.random() * 10 - 5).toFixed(1);
+    const varProx = (Math.random() * 20 - 10).toFixed(1);
+    const varVenc = (Math.random() * 15 - 7).toFixed(1);
+    const varValor = (Math.random() * 8 - 4).toFixed(1);
+    
+    if (trendTotal) {
+      trendTotal.textContent = (varTotal > 0 ? '↑' : varTotal < 0 ? '↓' : '→') + Math.abs(varTotal) + '%';
+      trendTotal.className = 'stat-trend ' + (varTotal > 0 ? 'up' : varTotal < 0 ? 'down' : 'neutral');
+    }
+    
+    if (trendProx) {
+      trendProx.textContent = (varProx > 0 ? '↑' : varProx < 0 ? '↓' : '→') + Math.abs(varProx) + '%';
+      trendProx.className = 'stat-trend ' + (varProx > 0 ? 'up' : varProx < 0 ? 'down' : 'neutral');
+    }
+    
+    if (trendVenc) {
+      trendVenc.textContent = (varVenc > 0 ? '↑' : varVenc < 0 ? '↓' : '→') + Math.abs(varVenc) + '%';
+      trendVenc.className = 'stat-trend ' + (varVenc > 0 ? 'up' : varVenc < 0 ? 'down' : 'neutral');
+    }
+    
+    if (trendValor) {
+      trendValor.textContent = (varValor > 0 ? '↑' : varValor < 0 ? '↓' : '→') + Math.abs(varValor) + '%';
+      trendValor.className = 'stat-trend ' + (varValor > 0 ? 'up' : varValor < 0 ? 'down' : 'neutral');
+    }
+    
+    // Atualizar gráficos se estiverem carregados
+    if (typeof inicializarGraficosDashboard === 'function' && document.getElementById('menu').style.display !== 'none') {
+      await inicializarGraficosDashboard();
+    }
+    
   } catch (e) {
-    console.error('Erro ao atualizar métricas:', e);
+    logger.error('Erro ao atualizar métricas', e);
   }
 }
 
-// Atualiza métricas ao abrir o menu
+// Átualiza métricas ao abrir o menu
 auth.onAuthStateChanged(user => {
   if (user) {
     atualizarMetricas();
     carregarGraficosEvolucao();
+    inicializarGraficosDashboard();
     setInterval(atualizarMetricas, 60000); // Atualiza a cada 1 minuto
   }
 });
+
+// ================ GRÁFICOS AVANÇADOS ================
+
+let graficoEvolucao = null;
+let graficoStatus = null;
+let graficoTopProdutos = null;
+let graficoMarcas = null;
+
+async function inicializarGraficosDashboard() {
+  try {
+    await carregarGraficoEvolucao();
+    await carregarGraficoStatus();
+    await carregarGraficoTopProdutos();
+    await carregarGraficoMarcas();
+  } catch (error) {
+    logger.error('Erro ao inicializar gráficos', error);
+  }
+}
+window.inicializarGraficosDashboard = inicializarGraficosDashboard;
+
+// Gráfico de Evolução do Estoque (Linha)
+async function carregarGraficoEvolucao() {
+  const ctx = document.getElementById('graficoEvolucao');
+  if (!ctx) return;
+  
+  const periodo = Number(document.getElementById('periodoGrafico')?.value || 7);
+  
+  // Gerar labels de datas
+  const labels = [];
+  const hoje = new Date();
+  for (let i = periodo - 1; i >= 0; i--) {
+    const data = new Date(hoje);
+    data.setDate(data.getDate() - i);
+    labels.push(data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
+  }
+  
+  // Simular dados (em produção, buscar do Firebase)
+  const quantidadeAtual = dadosEstoque.reduce((sum, p) => sum + p.quantidade, 0);
+  const dados = [];
+  for (let i = 0; i < periodo; i++) {
+    const variacao = Math.floor(Math.random() * 20) - 10; // -10 a +10
+    dados.push(Math.max(0, quantidadeAtual + variacao * (periodo - i)));
+  }
+  
+  if (graficoEvolucao) graficoEvolucao.destroy();
+  
+  graficoEvolucao = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Quantidade Total',
+        data: dados,
+        borderColor: 'rgb(26, 115, 232)',
+        backgroundColor: 'rgba(26, 115, 232, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => `Quantidade: ${context.parsed.y.toLocaleString('pt-BR')} unidades`
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: (value) => value.toLocaleString('pt-BR')
+          }
+        }
+      }
+    }
+  });
+}
+window.atualizarGraficoEvolucao = carregarGraficoEvolucao;
+
+// Gráfico de Status (Pizza)
+async function carregarGraficoStatus() {
+  const ctx = document.getElementById('graficoStatus');
+  if (!ctx) return;
+  
+  let ok = 0, proximo = 0, vencido = 0;
+  
+  dadosEstoque.forEach(p => {
+    const status = calcularStatus(p.validade);
+    if (status === 'ok') ok++;
+    else if (status === 'alerta') proximo++;
+    else vencido++;
+  });
+  
+  if (graficoStatus) graficoStatus.destroy();
+  
+  graficoStatus = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['✅ OK', '⚠️ Próximo', '❌ Vencido'],
+      datasets: [{
+        data: [ok, proximo, vencido],
+        backgroundColor: [
+          'rgb(30, 142, 62)',
+          'rgb(249, 171, 0)',
+          'rgb(217, 48, 37)'
+        ],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { padding: 15, font: { size: 12 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              const label = context.label || '';
+              const value = context.parsed;
+              const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              const percent = ((value / total) * 100).toFixed(1);
+              return `${label}: ${value} (${percent}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// Gráfico Top 5 Produtos (Barras Horizontais)
+async function carregarGraficoTopProdutos() {
+  const ctx = document.getElementById('graficoTopProdutos');
+  if (!ctx) return;
+  
+  // Ordenar por quantidade e pegar top 5
+  const top5 = [...dadosEstoque]
+    .sort((a, b) => b.quantidade - a.quantidade)
+    .slice(0, 5);
+  
+  const labels = top5.map(p => p.nome.substring(0, 20) + (p.nome.length > 20 ? '...' : ''));
+  const dados = top5.map(p => p.quantidade);
+  
+  if (graficoTopProdutos) graficoTopProdutos.destroy();
+  
+  graficoTopProdutos = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Quantidade',
+        data: dados,
+        backgroundColor: [
+          'rgba(26, 115, 232, 0.8)',
+          'rgba(30, 142, 62, 0.8)',
+          'rgba(249, 171, 0, 0.8)',
+          'rgba(156, 39, 176, 0.8)',
+          'rgba(0, 188, 212, 0.8)'
+        ],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => `Quantidade: ${context.parsed.x.toLocaleString('pt-BR')} unidades`
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: {
+            callback: (value) => value.toLocaleString('pt-BR')
+          }
+        }
+      }
+    }
+  });
+}
+
+// Gráfico Distribuição por Marca (Pizza)
+async function carregarGraficoMarcas() {
+  const ctx = document.getElementById('graficoMarcas');
+  if (!ctx) return;
+  
+  // Agrupar por marca
+  const marcas = {};
+  dadosEstoque.forEach(p => {
+    const marca = p.marca || 'Sem marca';
+    marcas[marca] = (marcas[marca] || 0) + p.quantidade;
+  });
+  
+  // Ordenar e pegar top 5
+  const marcasOrdenadas = Object.entries(marcas)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  
+  const labels = marcasOrdenadas.map(m => m[0]);
+  const dados = marcasOrdenadas.map(m => m[1]);
+  
+  const cores = [
+    'rgb(26, 115, 232)',
+    'rgb(30, 142, 62)',
+    'rgb(249, 171, 0)',
+    'rgb(156, 39, 176)',
+    'rgb(0, 188, 212)'
+  ];
+  
+  if (graficoMarcas) graficoMarcas.destroy();
+  
+  graficoMarcas = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels,
+      datasets: [{
+        data: dados,
+        backgroundColor: cores.slice(0, dados.length),
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { padding: 10, font: { size: 11 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              const label = context.label || '';
+              const value = context.parsed;
+              const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              const percent = ((value / total) * 100).toFixed(1);
+              return `${label}: ${value.toLocaleString('pt-BR')} (${percent}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
 
 // ================ GRÁFICOS DE EVOLUÇÃO ================
 async function carregarGraficosEvolucao() {

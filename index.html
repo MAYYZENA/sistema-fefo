@@ -224,14 +224,74 @@
     <div class="stat-card primary">
       <div class="stat-label">Total de Produtos</div>
       <div class="stat-value" id="totalProdutos">0</div>
+      <div class="stat-trend" id="trendTotal">+0%</div>
     </div>
     <div class="stat-card warning">
       <div class="stat-label">Próximo ao Vencimento</div>
       <div class="stat-value" id="proxVencer">0</div>
+      <div class="stat-trend" id="trendProx">+0%</div>
     </div>
     <div class="stat-card danger">
       <div class="stat-label">Vencidos</div>
       <div class="stat-value" id="vencidos">0</div>
+      <div class="stat-trend" id="trendVenc">+0%</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-label">Valor Total Est.</div>
+      <div class="stat-value" id="valorTotal">R$ 0</div>
+      <div class="stat-trend" id="trendValor">+0%</div>
+    </div>
+  </div>
+
+  <!-- Gráficos Avançados -->
+  <div class="row mb-4">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <h3 class="card-title">📈 Evolução do Estoque</h3>
+          <select id="periodoGrafico" class="form-select" style="width: auto;" onchange="atualizarGraficoEvolucao()">
+            <option value="7">Últimos 7 dias</option>
+            <option value="30">Últimos 30 dias</option>
+            <option value="90">Últimos 90 dias</option>
+          </select>
+        </div>
+        <div class="card-body">
+          <canvas id="graficoEvolucao" style="max-height: 300px;"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">📊 Status</h3>
+        </div>
+        <div class="card-body">
+          <canvas id="graficoStatus" style="max-height: 300px;"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🏆 Top 5 Produtos</h3>
+        </div>
+        <div class="card-body">
+          <canvas id="graficoTopProdutos" style="max-height: 250px;"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🏷️ Distribuição por Marca</h3>
+        </div>
+        <div class="card-body">
+          <canvas id="graficoMarcas" style="max-height: 250px;"></canvas>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -256,6 +316,14 @@
         <button class="action-btn" onclick="limparDadosAntigos()">
           <i class="fas fa-trash-alt"></i>
           <span>Limpar Dados</span>
+        </button>
+        <button class="action-btn" onclick="importarArquivo()">
+          <i class="fas fa-file-import"></i>
+          <span>Importar Dados</span>
+        </button>
+        <button class="action-btn" onclick="mostrarAjudaAtalhos()">
+          <i class="fas fa-keyboard"></i>
+          <span>Atalhos (Ctrl+H)</span>
         </button>
       </div>
     </div>
