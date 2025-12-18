@@ -217,9 +217,6 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
           if (produtoExistente.marca) {
             document.getElementById('marcaProduto').value = produtoExistente.marca;
           }
-          if (produtoExistente.categoria) {
-            document.getElementById('categoriaProduto').value = produtoExistente.categoria;
-          }
           if (produtoExistente.fornecedor) {
             document.getElementById('fornecedorProduto').value = produtoExistente.fornecedor;
           }
@@ -243,9 +240,6 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
           document.getElementById('nomeProduto').value = produtoCatalogo.nome || '';
           if (produtoCatalogo.marca) {
             document.getElementById('marcaProduto').value = produtoCatalogo.marca;
-          }
-          if (produtoCatalogo.categoria) {
-            document.getElementById('categoriaProduto').value = produtoCatalogo.categoria;
           }
           if (produtoCatalogo.fornecedor) {
             document.getElementById('fornecedorProduto').value = produtoCatalogo.fornecedor;
@@ -281,7 +275,6 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
               console.log('🎯 MATCH AUTOMÁTICO!', produtoInteligente.nome);
               document.getElementById('nomeProduto').value = produtoInteligente.nome;
               if (produtoInteligente.marca) document.getElementById('marcaProduto').value = produtoInteligente.marca;
-              if (produtoInteligente.categoria) document.getElementById('categoriaProduto').value = produtoInteligente.categoria;
               if (produtoInteligente.fornecedor) document.getElementById('fornecedorProduto').value = produtoInteligente.fornecedor;
               
               await db.collection('catalogo-produtos').doc(produtoInteligente.id).update({ codigo });
@@ -319,7 +312,6 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
               console.log('🎯 MATCH AUTOMÁTICO!', produtoInteligente.nome);
               document.getElementById('nomeProduto').value = produtoInteligente.nome;
               if (produtoInteligente.marca) document.getElementById('marcaProduto').value = produtoInteligente.marca;
-              if (produtoInteligente.categoria) document.getElementById('categoriaProduto').value = produtoInteligente.categoria;
               if (produtoInteligente.fornecedor) document.getElementById('fornecedorProduto').value = produtoInteligente.fornecedor;
               
               await db.collection('catalogo-produtos').doc(produtoInteligente.id).update({ codigo });
@@ -408,9 +400,6 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
         document.getElementById('nomeProduto').value = produtoEscolhido.nome || '';
         if (produtoEscolhido.marca) {
           document.getElementById('marcaProduto').value = produtoEscolhido.marca;
-        }
-        if (produtoEscolhido.categoria) {
-          document.getElementById('categoriaProduto').value = produtoEscolhido.categoria;
         }
         if (produtoEscolhido.fornecedor) {
           document.getElementById('fornecedorProduto').value = produtoEscolhido.fornecedor;
@@ -650,7 +639,6 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       const codigo = document.getElementById('codigoBarras').value.trim();
       const nome = document.getElementById('nomeProduto').value.trim();
       const marca = document.getElementById('marcaProduto').value;
-      const categoria = document.getElementById('categoriaProduto').value;
       const lote = document.getElementById('loteProduto').value.trim();
       const fornecedor = document.getElementById('fornecedorProduto').value.trim();
       const local = document.getElementById('localProduto')?.value || '';
@@ -666,10 +654,6 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
         mostrarToast('Selecione a marca.', true);
         return;
       }
-      if (!categoria) {
-        mostrarToast('Selecione a categoria.', true);
-        return;
-      }
       if (!quantidade || quantidade <= 0) {
         mostrarToast('Informe uma quantidade válida.', true);
         return;
@@ -682,7 +666,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       mostrarLoader(true);
       
       const dadosProduto = {
-        codigo, nome, marca, categoria, lote, fornecedor, local, quantidade, estoqueMinimo,
+        codigo, nome, marca, lote, fornecedor, local, quantidade, estoqueMinimo,
         validade: firebase.firestore.Timestamp.fromDate(new Date(validadeInput))
       };
       
@@ -1414,7 +1398,6 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       document.getElementById('codigoBarras').value = p.codigo || '';
       document.getElementById('nomeProduto').value = p.nome || '';
       document.getElementById('marcaProduto').value = p.marca || '';
-      document.getElementById('categoriaProduto').value = p.categoria || '';
       document.getElementById('loteProduto').value = p.lote || '';
       document.getElementById('fornecedorProduto').value = p.fornecedor || '';
       document.getElementById('quantidadeProduto').value = p.quantidade || 0;
