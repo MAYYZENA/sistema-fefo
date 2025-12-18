@@ -192,24 +192,18 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       if (!email || !senha) { mostrarToast('Preencha email e senha', true); return; }
       await auth.signInWithEmailAndPassword(email, senha);
       
+      // Esconder login
+      document.getElementById('login').style.display = 'none';
+      
       // Mostrar sidebar e main content
       const sidebar = document.getElementById('sidebar');
       const mainContent = document.getElementById('mainContent');
       if (sidebar) sidebar.classList.remove('d-none');
-      if (mainContent) {
-        mainContent.classList.remove('d-none');
-        // Mover todas as telas para dentro do content-area
-        const contentArea = mainContent.querySelector('.content-area');
-        const telas = document.querySelectorAll('.tela');
-        telas.forEach(tela => {
-          if (tela.id !== 'login' && contentArea && !contentArea.contains(tela)) {
-            contentArea.appendChild(tela);
-          }
-        });
-      }
+      if (mainContent) mainContent.classList.remove('d-none');
       
       abrir('menu');
       mostrarToast('Login realizado com sucesso!', false);
+      
       // Solicita permissão de notificações após 2 segundos
       setTimeout(() => {
         solicitarPermissaoNotificacao();
@@ -229,13 +223,14 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   }
 
   function logout() { 
-    auth.signOut(); 
+    auth.signOut();
+    // Mostrar login
+    document.getElementById('login').style.display = 'flex';
     // Esconder sidebar e main content
     const sidebar = document.getElementById('sidebar');
     const mainContent = document.getElementById('mainContent');
     if (sidebar) sidebar.classList.add('d-none');
     if (mainContent) mainContent.classList.add('d-none');
-    abrir('login'); 
   }
 
   // ================ MARCAS (FIRESTORE) ================
