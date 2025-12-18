@@ -1,0 +1,35 @@
+{
+  "name": "GESTÃO FEFO - Sistema de Estoque",
+  "short_name": "GESTÃO FEFO",
+  "description": "Sistema profissional de gerenciamento de estoque com foco em Primeiro a Vencer, Primeiro a Sair",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d6efd",
+  "theme_color": "#0d6efd",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='105' fill='%230d6efd'/%3E%3Crect x='128' y='180' width='256' height='210' rx='25' fill='white'/%3E%3Crect x='180' y='230' width='152' height='48' rx='12' fill='%230d6efd'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Adicionar Produto",
+      "short_name": "Adicionar",
+      "description": "Cadastrar novo produto no estoque",
+      "url": "/?action=add",
+      "icons": [{"src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230d6efd' d='M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z'/%3E%3C/svg%3E", "sizes": "96x96"}]
+    },
+    {
+      "name": "Escanear Código",
+      "short_name": "Escanear",
+      "description": "Abrir leitor de código de barras",
+      "url": "/?action=scan",
+      "icons": [{"src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230d6efd' d='M4 6h5V4H4c-1.1 0-2 .9-2 2v5h2V6zm0 13v-5H2v5c0 1.1.9 2 2 2h5v-2H4zm16-13v5h2V6c0-1.1-.9-2-2-2h-5v2h5zm0 13h-5v2h5c1.1 0 2-.9 2-2v-5h-2v5zM8 12h8v-2H8v2z'/%3E%3C/svg%3E", "sizes": "96x96"}]
+    }
+  ]
+}

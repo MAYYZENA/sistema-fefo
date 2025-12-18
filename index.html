@@ -1,0 +1,670 @@
+  <!-- Loader global -->
+  <div id="global-loader" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2000;background:rgba(255,255,255,.6);align-items:center;justify-content:center;">
+    <div class="spinner-border text-primary" style="width:3rem;height:3rem;" role="status" aria-label="Carregando..."></div>
+  </div>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Sistema FEFO — gerenciamento de estoque com foco em Primeiro a Vencer, Primeiro a Sair">
+<meta name="theme-color" content="#0d6efd">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23667eea' width='100' height='100' rx='20'/><text y='70' font-size='60' x='50' text-anchor='middle' fill='%23fff'>📦</text></svg>">
+<title>GESTÃO FEFO</title>
+
+<!-- Bootstrap -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<!-- FontAwesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<!-- Libs -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+<script src="https://unpkg.com/html5-qrcode" defer></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js" defer></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+
+  <!-- QRCode.js para gerar QR Code de acesso mobile -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+  
+  <!-- Catálogo de produtos Unilife -->
+  <script src="produtos-unilife.js" defer></script>
+
+</head>
+
+
+<body>
+
+  <a class="skip-link" href="#main">Ir para o conteúdo</a>
+  <div id="toast" class="toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-4" role="alert" aria-live="polite" aria-atomic="true" style="z-index:1080;display:none;min-width:220px">
+    <div class="d-flex">
+      <div class="toast-body" id="toast-body">Ação realizada com sucesso!</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Fechar" onclick="document.getElementById('toast').style.display='none'"></button>
+    </div>
+  </div>
+
+  <nav class="navbar navbar-dark px-3" role="navigation" aria-label="Barra de navegação principal" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+    <span class="navbar-brand d-flex align-items-center gap-2" style="font-weight:700;letter-spacing:0.5px;">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="7" width="20" height="13" rx="2" fill="#0d6efd"/><rect x="4" y="9" width="16" height="9" rx="1" fill="#fff"/><rect x="7" y="12" width="10" height="3" rx="1" fill="#0d6efd"/></svg>
+      GESTÃO FEFO
+    </span>
+  </nav>
+
+  <main id="main" class="container my-4" role="main" tabindex="-1">
+
+
+<!-- LOGIN -->
+<section id="login" class="tela" aria-labelledby="login-title">
+  <div class="row justify-content-center">
+    <div class="col-md-5">
+      <div class="card shadow-lg" style="border-radius:1rem;border:none;">
+        <div class="card-header text-center py-4" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);border-radius:1rem 1rem 0 0;border:none;">
+          <h4 class="text-white mb-0" style="font-weight:700;letter-spacing:1px;">🔐 GESTÃO FEFO</h4>
+          <p class="text-white-50 mb-0 mt-1" style="font-size:0.9rem;">Sistema de Controle de Estoque</p>
+        </div>
+        <div class="card-body p-4">
+          <h5 class="text-center mb-4" id="login-title" style="color:#667eea;font-weight:600;">Faça seu login</h5>
+          <label for="email" class="visually-hidden">Email</label>
+          <input id="email" class="form-control mb-3" placeholder="📧 Email" autocomplete="username" aria-required="true" tabindex="3" style="padding:0.75rem 1rem;border-radius:0.5rem;border:2px solid #e0e0e0;">
+          <label for="senha" class="visually-hidden">Senha</label>
+          <input id="senha" type="password" class="form-control mb-4" placeholder="🔒 Senha" autocomplete="current-password" aria-required="true" tabindex="4" style="padding:0.75rem 1rem;border-radius:0.5rem;border:2px solid #e0e0e0;">
+          <div class="d-grid gap-3">
+            <button class="btn btn-primary" onclick="login()" data-bs-toggle="tooltip" data-bs-placement="top" title="Entrar no sistema" aria-label="Entrar no sistema" tabindex="5" style="padding:0.75rem;font-weight:600;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);border:none;border-radius:0.5rem;">✨ Entrar</button>
+            <button class="btn btn-outline-secondary" onclick="registrar()" data-bs-toggle="tooltip" data-bs-placement="top" title="Criar novo usuário" aria-label="Criar novo usuário" tabindex="6" style="padding:0.75rem;font-weight:600;border-radius:0.5rem;border:2px solid #667eea;color:#667eea;">📝 Criar Conta</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MENU -->
+<section id="menu" class="tela d-none" aria-labelledby="menu-title">
+  <h1 id="menu-title" class="visually-hidden">Menu principal</h1>
+  
+  <!-- Hero Section com Dashboard -->
+  <div class="dashboard-hero mb-4">
+    <div class="row g-4 mb-4">
+      <div class="col-12">
+        <div class="welcome-card glass-card">
+          <h2 class="mb-0">👋 Olá! Bem-vindo ao seu estoque</h2>
+          <p class="mb-0 mt-2 text-muted">Gerencie seus produtos com eficiência e controle total</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Métricas Dashboard -->
+    <div class="row g-4 mb-4">
+      <div class="col-md-4">
+        <div class="metric-card glass-card metric-primary">
+          <div class="metric-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M3 9h18M9 21V9"/>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <div class="metric-label">Total de Produtos</div>
+            <div class="metric-value" id="totalProdutos">0</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="metric-card glass-card metric-warning">
+          <div class="metric-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <div class="metric-label">Próximo do Vencimento</div>
+            <div class="metric-value" id="proxVencer">0</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="metric-card glass-card metric-danger">
+          <div class="metric-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="15" y1="9" x2="9" y2="15"/>
+              <line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <div class="metric-label">Vencidos</div>
+            <div class="metric-value" id="vencidos">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filtros Rápidos -->
+    <div class="row g-3 mb-4">
+      <div class="col-12">
+        <div class="filter-container glass-card">
+          <span class="filter-label">🔍 Filtrar por:</span>
+          <div class="btn-group" role="group">
+            <button type="button" class="btn btn-filter active" onclick="filtrarDashboard('todos')">Todos</button>
+            <button type="button" class="btn btn-filter" onclick="filtrarDashboard('proxVencer')">⏰ Próx. Vencimento</button>
+            <button type="button" class="btn btn-filter" onclick="filtrarDashboard('vencidos')">❌ Vencidos</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ações Principais -->
+  <div class="row g-3 mb-4" id="actionCardsContainer">
+    <div class="col-md-6 col-lg-3" draggable="true" data-card="estoque">
+      <button class="action-card glass-card w-100" onclick="abrir('estoque')">
+        <div class="action-icon action-primary">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 3h18v4H3V3zm0 6h18v10a2 2 0 01-2 2H5a2 2 0 01-2-2V9zm4 3h10v2H7v-2z"/>
+          </svg>
+        </div>
+        <div class="action-content">
+          <div class="action-title">📦 Estoque</div>
+          <div class="action-desc">Gerenciar produtos</div>
+        </div>
+      </button>
+    </div>
+    <div class="col-md-6 col-lg-3" draggable="true" data-card="curvaABC">
+      <button class="action-card glass-card w-100" onclick="abrir('curvaABC')">
+        <div class="action-icon action-success">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 3h3v18H3V3zm6 5h3v13H9V8zm6 3h3v10h-3V11z"/>
+          </svg>
+        </div>
+        <div class="action-content">
+          <div class="action-title">📊 Curva ABC</div>
+          <div class="action-desc">Análise de produtos</div>
+        </div>
+      </button>
+    </div>
+    <div class="col-md-6 col-lg-3" draggable="true" data-card="historico">
+      <button class="action-card glass-card w-100" onclick="abrir('historico')">
+        <div class="action-icon action-info">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+        </div>
+        <div class="action-content">
+          <div class="action-title">📜 Histórico</div>
+          <div class="action-desc">Movimentações</div>
+        </div>
+      </button>
+    </div>
+    <div class="col-md-6 col-lg-3" draggable="true" data-card="notificacoes">
+      <button class="action-card glass-card w-100" onclick="solicitarPermissaoNotificacao()">
+        <div class="action-icon action-warning">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+        </div>
+        <div class="action-content">
+          <div class="action-title">🔔 Notificações</div>
+          <div class="action-desc">Ativar alertas</div>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Ações Secundárias -->
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <button class="secondary-btn glass-card w-100" onclick="abrirConfiguracoes()">
+        ⚙️ Configurações
+      </button>
+    </div>
+    <div class="col-md-3">
+      <button class="secondary-btn glass-card w-100" onclick="fazerBackup()">
+        💾 Backup
+      </button>
+    </div>
+    <div class="col-md-3">
+      <button class="secondary-btn glass-card w-100" onclick="toggleDarkMode()">
+        <span id="dark-icon-menu">🌙</span> Tema
+      </button>
+    </div>
+    <div class="col-md-3">
+      <button class="secondary-btn glass-card w-100 btn-logout" onclick="logout()">
+        🚪 Sair
+      </button>
+    </div>
+  </div>
+  
+  <div class="row g-3">
+    <div class="col-md-6">
+      <button class="secondary-btn glass-card w-100" onclick="compartilharRelatorio('whatsapp')">
+        📱 Compartilhar WhatsApp
+      </button>
+    </div>
+    <div class="col-md-6">
+      <button class="secondary-btn glass-card w-100" onclick="limparDadosAntigos()">
+        🧹 Limpar Dados
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- MODAL DE CONFIGURAÇÕES -->
+<div class="modal fade" id="modalConfiguracoes" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">⚙️ Configurações de Alertas</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="diasAlerta" class="form-label">📅 Alertar quando faltar:</label>
+          <select id="diasAlerta" class="form-select">
+            <option value="7">7 dias</option>
+            <option value="15">15 dias</option>
+            <option value="30">30 dias</option>
+            <option value="45">45 dias</option>
+            <option value="60">60 dias</option>
+          </select>
+        </div>
+        
+        <div class="mb-3">
+          <label for="horarioAlerta" class="form-label">🕐 Horário das notificações:</label>
+          <input type="time" id="horarioAlerta" class="form-control" value="09:00">
+        </div>
+        
+        <div class="mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="alertaEmail" checked>
+            <label class="form-check-label" for="alertaEmail">📧 Alertas por email</label>
+          </div>
+        </div>
+        
+        <div class="mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="alertaNavegador" checked>
+            <label class="form-check-label" for="alertaNavegador">🔔 Alertas no navegador</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="salvarConfiguracoes()">💾 Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ESTOQUE -->
+<section id="estoque" class="tela d-none" aria-labelledby="estoque-title">
+<h2 id="estoque-title" class="visually-hidden">Gestão de Estoque</h2>
+
+<div class="row g-3">
+
+<!-- CADASTRO -->
+<div class="col-lg-4">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h6>Cadastro de Produto</h6>
+
+      <button class="btn btn-outline-primary w-100 mb-2" onclick="abrirScanner()" data-bs-toggle="tooltip" data-bs-placement="top" title="Abrir leitor de código de barras">
+        <svg width="18" height="18" fill="currentColor" aria-hidden="true" style="vertical-align:-2px"><rect x="2" y="2" width="3" height="3" rx="1"/><rect x="19" y="2" width="3" height="3" rx="1"/><rect x="2" y="19" width="3" height="3" rx="1"/><rect x="19" y="19" width="3" height="3" rx="1"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg> Bipar Código
+      </button>
+      
+      <button class="btn btn-outline-success w-100 mb-2" onclick="importarProdutosEdin()" title="Importar catálogo completo de produtos Edin">
+        📦 Importar Produtos Edin
+      </button>
+
+      <div id="scanner"></div>
+
+      <label for="codigoBarras" class="visually-hidden">Código de barras</label>
+      <div class="input-group mb-2">
+        <input id="codigoBarras" class="form-control" placeholder="Código de barras" autocomplete="off" inputmode="numeric" aria-label="Código de barras" tabindex="8">
+        <button class="btn btn-primary" type="button" onclick="buscarProdutoPorCodigoBarras(document.getElementById('codigoBarras').value)" title="Buscar informações do produto" style="min-width: 80px;">
+          🔍 <span class="d-none d-sm-inline">Buscar</span>
+        </button>
+      </div>
+      <label for="nomeProduto" class="visually-hidden">Produto</label>
+      <input id="nomeProduto" class="form-control mb-2" placeholder="Produto" autocomplete="off" aria-label="Nome do produto" tabindex="9">
+      <label for="marcaProduto" class="visually-hidden">Marca</label>
+      <select id="marcaProduto" class="form-select mb-2" disabled aria-label="Marca do produto" tabindex="10">
+      <option value="">Selecione a marca</option>
+      </select>
+      <label for="categoriaProduto" class="visually-hidden">Categoria</label>
+      <select id="categoriaProduto" class="form-select mb-2" aria-label="Categoria do produto" tabindex="10">
+        <option value="">Selecione a categoria</option>
+        <option value="Alimentos">🍎 Alimentos</option>
+        <option value="Bebidas">🥤 Bebidas</option>
+        <option value="Medicamentos">💊 Medicamentos</option>
+        <option value="Limpeza">🧹 Limpeza</option>
+        <option value="Higiene">🧼 Higiene</option>
+        <option value="Outros">📦 Outros</option>
+      </select>
+      <label for="loteProduto" class="visually-hidden">Lote</label>
+      <input id="loteProduto" class="form-control mb-2" placeholder="Lote (opcional)" autocomplete="off" aria-label="Lote" tabindex="10">
+      <label for="fornecedorProduto" class="visually-hidden">Fornecedor</label>
+      <input id="fornecedorProduto" class="form-control mb-2" placeholder="Fornecedor (opcional)" autocomplete="off" aria-label="Fornecedor" tabindex="10">
+      <label for="quantidadeProduto" class="visually-hidden">Quantidade</label>
+      <input id="quantidadeProduto" type="number" class="form-control mb-2" placeholder="Quantidade" autocomplete="off" aria-label="Quantidade" tabindex="11">
+      <label for="estoqueMinimo" class="visually-hidden">Estoque Mínimo</label>
+      <input id="estoqueMinimo" type="number" class="form-control mb-2" placeholder="Estoque Mínimo (opcional)" autocomplete="off" aria-label="Estoque mínimo" tabindex="12">
+      <label for="validadeProduto" class="visually-hidden">Validade</label>
+      <input id="validadeProduto" type="date" class="form-control mb-3" aria-label="Validade" tabindex="13">
+
+      <div class="d-grid gap-2">
+        <button class="btn btn-success" onclick="salvarProduto()" data-bs-toggle="tooltip" data-bs-placement="top" title="Salvar produto no estoque" aria-label="Salvar produto" tabindex="14">
+          <svg width="18" height="18" fill="currentColor" aria-hidden="true" style="vertical-align:-2px"><path d="M5 2a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.828a2 2 0 0 0-.586-1.414l-3.828-3.828A2 2 0 0 0 15.172 1H5zm0 2h10v4a2 2 0 0 0 2 2h4v10H5V4zm12 0v4h4l-4-4z"/></svg> Salvar
+        </button>
+        <button class="btn btn-outline-secondary" onclick="exportarExcel()" data-bs-toggle="tooltip" data-bs-placement="top" title="Exportar relatório Excel (XLSX)" aria-label="Exportar Excel" tabindex="15">
+          <svg width="18" height="18" fill="currentColor" aria-hidden="true" style="vertical-align:-2px"><rect x="2" y="2" width="14" height="14" rx="2" fill="#198754"/><text x="9" y="13" text-anchor="middle" font-size="8" fill="#fff">X</text></svg> Exportar Excel
+        </button>
+        <button class="btn btn-outline-danger" onclick="exportarPDF()" data-bs-toggle="tooltip" data-bs-placement="top" title="Exportar relatório PDF profissional" aria-label="Exportar PDF" tabindex="15">
+          <svg width="18" height="18" fill="currentColor" aria-hidden="true" style="vertical-align:-2px"><rect x="2" y="2" width="14" height="14" rx="2" fill="#dc3545"/><text x="9" y="13" text-anchor="middle" font-size="7" fill="#fff">PDF</text></svg> Exportar PDF
+        </button>
+      <footer class="text-center text-small muted-note mt-5 mb-2">
+        <span>Sistema FEFO &copy; 2025 &mdash; Profissionalizado por <a href="#" tabindex="-1">Sua Empresa</a></span>
+        <button id="toggle-dark" class="btn btn-sm btn-outline-secondary ms-2" style="vertical-align:middle" aria-label="Alternar tema escuro/claro" onclick="toggleDarkMode()">
+          <span id="dark-icon" aria-hidden="true">🌙</span> <span class="visually-hidden">Alternar tema</span>
+        </button>
+      </footer>
+        <script>
+          // Sincroniza ícone do botão de tema no menu
+          function updateDarkIconMenu() {
+            const icon = document.getElementById('dark-icon-menu');
+            if (!icon) return;
+            icon.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+          }
+          document.addEventListener('DOMContentLoaded', function () {
+            updateDarkIconMenu();
+            document.body.addEventListener('classChange', updateDarkIconMenu);
+          });
+          // Hook para atualizar ícone ao alternar tema
+          const origToggleDark = window.toggleDarkMode;
+          window.toggleDarkMode = function() {
+            origToggleDark();
+            updateDarkIconMenu();
+          }
+        </script>
+      <script>
+        // Ativa tooltips Bootstrap
+        document.addEventListener('DOMContentLoaded', function () {
+          if (window.bootstrap && bootstrap.Tooltip) {
+            [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]')).forEach(function (el) {
+              new bootstrap.Tooltip(el);
+            });
+          }
+          // Dark mode inicial
+          try {
+            if (localStorage.getItem('fefo-dark') === '1') document.body.classList.add('dark');
+          } catch(e) { /* Storage bloqueado */ }
+          updateDarkIcon();
+        });
+        function toggleDarkMode() {
+          document.body.classList.toggle('dark');
+          const isDark = document.body.classList.contains('dark');
+          try {
+            localStorage.setItem('fefo-dark', isDark ? '1' : '0');
+          } catch(e) { /* Storage bloqueado */ }
+          updateDarkIcon();
+        }
+        function updateDarkIcon() {
+          const icon = document.getElementById('dark-icon');
+          if (!icon) return;
+          icon.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+        }
+      </script>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TABELA ERP -->
+<div class="col-lg-8">
+  <div class="card shadow-sm">
+    <div class="card-body">
+
+          <div class="row g-2 mb-3">
+        <div class="col-md-6">
+          <label for="buscaEstoque" class="visually-hidden">Buscar no estoque</label>
+          <input id="buscaEstoque" class="form-control" aria-label="Buscar estoque"
+            placeholder="Buscar produto, marca ou código" onkeyup="filtrarEstoque()" tabindex="16">
+        </div>
+        <div class="col-md-4">
+          <label for="filtroMarca" class="visually-hidden">Filtrar por marca</label>
+          <select id="filtroMarca" class="form-select" onchange="filtrarEstoque()" aria-label="Filtrar por marca" tabindex="17">
+            <option value="">Todas as marcas</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-hover table-sm">
+          <thead class="table-dark">
+            <tr>
+              <th>Código</th>
+              <th>Produto</th>
+              <th>Marca</th>
+              <th>Qtd</th>
+              <th>Validade</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaEstoque"></tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</div>
+
+<button class="btn btn-link mt-3" onclick="voltar()" aria-label="Voltar ao menu" tabindex="18">⬅ Voltar</button>
+</section>
+
+<!-- HISTÓRICO DE MOVIMENTAÇÕES -->
+<section id="historico" class="tela d-none" aria-labelledby="historico-title">
+  <h2 id="historico-title" class="visually-hidden">Histórico de Movimentações</h2>
+  
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h6 class="mb-3">Movimentações Recentes</h6>
+      <div class="table-responsive">
+        <table class="table table-hover table-sm">
+          <thead class="table-dark">
+            <tr>
+              <th>Data/Hora</th>
+              <th>Tipo</th>
+              <th>Produto</th>
+              <th>Marca</th>
+              <th>Qtd</th>
+              <th>Usuário</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaHistorico"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <button class="btn btn-link mt-3" onclick="voltar()" aria-label="Voltar ao menu">⬅ Voltar</button>
+</section>
+
+<!-- CURVA ABC -->
+<section id="curvaABC" class="tela d-none" aria-labelledby="curva-title">
+  <h2 id="curva-title" class="visually-hidden">Curva ABC</h2>
+
+  <!-- Header da Curva ABC -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="glass-card" style="padding:1.5rem;text-align:center;">
+        <h2 style="font-size:1.8rem;font-weight:700;margin-bottom:0.5rem;">📊 Análise de Curva ABC</h2>
+        <p class="text-muted mb-0">Classificação de produtos por importância e quantidade</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cards de Resumo -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="abc-summary-card glass-card curve-a">
+        <div class="abc-icon">🎯</div>
+        <div class="abc-content">
+          <div class="abc-title">Curva A</div>
+          <div class="abc-subtitle">80% do valor</div>
+          <div class="abc-count" id="countA">0 itens</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="abc-summary-card glass-card curve-b">
+        <div class="abc-icon">📈</div>
+        <div class="abc-content">
+          <div class="abc-title">Curva B</div>
+          <div class="abc-subtitle">15% do valor</div>
+          <div class="abc-count" id="countB">0 itens</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="abc-summary-card glass-card curve-c">
+        <div class="abc-icon">📉</div>
+        <div class="abc-content">
+          <div class="abc-title">Curva C</div>
+          <div class="abc-subtitle">5% do valor</div>
+          <div class="abc-count" id="countC">0 itens</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- GRÁFICO ABC -->
+    <div class="col-lg-6">
+      <div class="glass-card" style="padding:1.5rem;height:100%;">
+        <h5 class="mb-3" style="font-weight:700;color:#667eea;">🍰 Distribuição por Curva</h5>
+        <div style="position:relative;height:300px;">
+          <canvas id="graficoABC"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOP PRODUTOS -->
+    <div class="col-lg-6">
+      <div class="glass-card" style="padding:1.5rem;height:100%;">
+        <h5 class="mb-3" style="font-weight:700;color:#667eea;">🏆 Top 10 Produtos</h5>
+        <div style="position:relative;height:300px;">
+          <canvas id="graficoProdutos"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Listas Detalhadas -->
+  <div class="row g-4 mt-2">
+    <div class="col-md-4">
+      <div class="glass-card abc-list-card curve-a">
+        <div class="abc-list-header">
+          <h6>🎯 Curva A</h6>
+          <span class="badge">Alta Prioridade</span>
+        </div>
+        <div id="listaCurvaA" class="abc-list-content"></div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="glass-card abc-list-card curve-b">
+        <div class="abc-list-header">
+          <h6>📈 Curva B</h6>
+          <span class="badge">Média Prioridade</span>
+        </div>
+        <div id="listaCurvaB" class="abc-list-content"></div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="glass-card abc-list-card curve-c">
+        <div class="abc-list-header">
+          <h6>📉 Curva C</h6>
+          <span class="badge">Baixa Prioridade</span>
+        </div>
+        <div id="listaCurvaC" class="abc-list-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-center mt-4">
+    <button class="btn btn-outline-secondary btn-lg" onclick="voltar()">Voltar ao Menu</button>
+  </div>
+</section>
+
+</main>
+
+<!-- Footer Profissional -->
+<footer class="mt-5 py-4 text-center" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);color:#fff;">
+  <div class="container">
+    <p class="mb-2" style="font-weight:600;font-size:1.1rem;">📦 GESTÃO FEFO</p>
+    <p class="mb-2" style="font-size:0.9rem;opacity:0.9;">Sistema Profissional de Controle de Estoque FEFO</p>
+    <p class="mb-0" style="font-size:0.8rem;opacity:0.7;">&copy; 2025 - Todos os direitos reservados</p>
+  </div>
+</footer>
+
+<!-- QR Code de acesso mobile - Canto inferior direito -->
+<div id="qrcode-access" style="position:fixed;bottom:20px;right:20px;z-index:1000;background:rgba(255,255,255,0.98);border-radius:12px;padding:10px;box-shadow:0 4px 16px rgba(0,0,0,0.2);max-width:130px;opacity:0.7;transition:all 0.3s ease;">
+  <div class="text-center">
+    <div id="qrcode" style="margin:0 auto;"></div>
+    <div class="mt-1" style="font-size:0.65rem;color:#666;font-weight:600;">📱 Acesso Mobile</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+<script src="app.js" defer></script>
+<script>
+  // Ativa tooltips Bootstrap
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.bootstrap && bootstrap.Tooltip) {
+      [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]')).forEach(function (el) {
+        new bootstrap.Tooltip(el);
+      });
+    }
+    // Gera QR Code de acesso mobile com IP local e porta
+    function getLocalUrl() {
+      // Retorna o endereço público (altere após fazer deploy no GitHub Pages)
+      return window.location.origin + window.location.pathname;
+    }
+    var qrcodeDiv = document.getElementById('qrcode');
+    if (qrcodeDiv && window.QRCode) {
+      // Limpa o conteúdo antes de gerar para evitar duplicidade
+      qrcodeDiv.innerHTML = "";
+      var url = getLocalUrl();
+      new QRCode(qrcodeDiv, {
+        text: url,
+        width: 100,
+        height: 100,
+        colorDark : "#222",
+        colorLight : "#fff",
+        correctLevel : QRCode.CorrectLevel.H
+      });
+    } else if (qrcodeDiv) {
+      qrcodeDiv.innerHTML = '<div style="color:red;font-weight:bold">Erro ao carregar QR Code.<br>Verifique se o arquivo <code>vendor/qrcode.min.js</code> existe e está acessível.</div>';
+    }
+  });
+</script>
+
+</body>
+</html>
