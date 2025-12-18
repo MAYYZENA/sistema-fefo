@@ -64,6 +64,19 @@ function verificarProdutosVencendo() {
 // Verifica produtos vencendo ao carregar e a cada 6 horas
 setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
 
+// ================ VARIÁVEIS GLOBAIS ================
+let usuarioAtual = null;
+let empresaAtual = null;
+
+// Função auxiliar para obter caminho da coleção isolada por usuário
+function getCollection(collectionName) {
+  if (!auth.currentUser) {
+    console.error('Usuário não autenticado');
+    throw new Error('Usuário não autenticado');
+  }
+  return db.collection('usuarios').doc(auth.currentUser.uid).collection(collectionName);
+}
+
 (function () {
   'use strict';
 
@@ -104,18 +117,6 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     } else {
       alert('Abra o console do Firebase → Firestore → Rules e cole o seguinte:\n\n' + rules);
     }
-  }
-
-  let usuarioAtual = null;
-  let empresaAtual = null;
-
-  // Função auxiliar para obter caminho da coleção isolada por usuário
-  function getCollection(collectionName) {
-    if (!auth.currentUser) {
-      console.error('Usuário não autenticado');
-      throw new Error('Usuário não autenticado');
-    }
-    return db.collection('usuarios').doc(auth.currentUser.uid).collection(collectionName);
   }
 
   // ================ CONTROLE DE TELAS ================
@@ -2897,8 +2898,6 @@ async function excluirLocal(id, nome) {
 }
 
 // ==================== 🆕 GERENCIAMENTO DE USUÁRIOS ====================
-let usuarioAtual = null;
-
 // Carregar perfil do usuário atual
 async function carregarPerfilUsuario() {
   const user = auth.currentUser;
@@ -3130,11 +3129,11 @@ async function verificarLimitePlano() {
 
 // ==================== PERFIL DA EMPRESA ====================
 function mostrarPerfil() {
-  document.getElementById('secaoEstoque').classList.add('hidden');
-  document.getElementById('secaoHistorico').classList.add('hidden');
-  document.getElementById('secaoCurvaABC').classList.add('hidden');
-  document.getElementById('secaoRelatorios').classList.add('hidden');
-  document.getElementById('secaoConfiguracoes').classList.add('hidden');
+  const secoes = ['secaoEstoque', 'secaoHistorico', 'secaoCurvaABC', 'secaoRelatorios', 'secaoConfiguracoes'];
+  secoes.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
   
   let secaoPerfil = document.getElementById('secaoPerfil');
   if (!secaoPerfil) {
@@ -3388,25 +3387,24 @@ function mostrarDashboardAdmin() {
     return;
   }
   
-  document.getElementById('secaoEstoque').classList.add('hidden');
-  document.getElementById('secaoHistorico').classList.add('hidden');
-  document.getElementById('secaoCurvaABC').classList.add('hidden');
-  document.getElementById('secaoRelatorios').classList.add('hidden');
-  document.getElementById('secaoConfiguracoes').classList.add('hidden');
-  if (document.getElementById('secaoPerfil')) {
-    document.getElementById('secaoPerfil').classList.add('hidden');
-  }
+  const secoes = ['secaoEstoque', 'secaoHistorico', 'secaoCurvaABC', 'secaoRelatorios', 'secaoConfiguracoes', 'secaoPerfil'];
+  secoes.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
   
   let secaoAdmin = document.getElementById('secaoAdmin');
   if (!secaoAdmin) {
     secaoAdmin = document.createElement('div');
     secaoAdmin.id = 'secaoAdmin';
     secaoAdmin.className = 'secao';
-    document.getElementById('conteudo').appendChild(secaoAdmin);
+    const conteudo = document.getElementById('conteudo');
+    if (conteudo) conteudo.appendChild(secaoAdmin);
   }
   
   secaoAdmin.classList.remove('hidden');
-  document.getElementById('pageTitle').textContent = 'Dashboard Admin';
+  const pageTitle = document.getElementById('pageTitle');
+  if (pageTitle) pageTitle.textContent = 'Dashboard Admin';
   carregarDashboardAdmin();
 }
 
