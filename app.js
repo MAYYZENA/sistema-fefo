@@ -1567,6 +1567,10 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
 
   // ================ CURVA ABC ================
   let graficoABC = null, graficoProdutos = null;
+  
+  // Variável global para armazenar produtos da curva ABC
+  let produtosCurvaABC = [];
+  
   async function carregarCurvaABC() {
     try {
       mostrarLoader(true);
@@ -1702,9 +1706,6 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     }
   }
 
-  // Variável global para armazenar produtos da curva ABC
-  let produtosCurvaABC = [];
-
   function desenharGraficoABC(countA, countB, countC, produtos) {
     if (graficoABC) graficoABC.destroy();
     
@@ -1764,8 +1765,8 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     });
   }
 
-  // Filtrar tabela por classificação
-  function filtrarCurva(curva) {
+  // Funções auxiliares - expostas globalmente
+  window.filtrarCurva = function(curva) {
     const tbody = document.getElementById('tabelaCurvaABCBody');
     const badge = document.getElementById('filtroAtivo');
     const busca = document.getElementById('buscaCurva');
@@ -1797,13 +1798,13 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   }
 
   // Buscar na tabela
-  function buscarNaCurva() {
+  window.buscarNaCurva = function() {
     const busca = document.getElementById('buscaCurva').value.toLowerCase();
     const tbody = document.getElementById('tabelaCurvaABCBody');
     
     if (!busca) {
       // Se vazio, mostrar todos
-      filtrarCurva('TODAS');
+      window.filtrarCurva('TODAS');
       return;
     }
     
@@ -1827,7 +1828,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   }
 
   // Toggle gráfico
-  function toggleGrafico() {
+  window.toggleGrafico = function() {
     const card = document.getElementById('cardGraficoABC');
     if (card.style.display === 'none') {
       card.style.display = 'block';
