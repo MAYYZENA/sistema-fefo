@@ -276,6 +276,12 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       // Atualizar badge do plano no header
       atualizarBadgePlano();
       
+      // Mostrar menu admin se for administrador
+      if (empresaAtual.isAdmin) {
+        const menuAdmin = document.getElementById('menuAdmin');
+        if (menuAdmin) menuAdmin.classList.remove('d-none');
+      }
+      
       abrir('menu');
       atualizarMetricas();
       mostrarToast('Login realizado com sucesso!', false);
@@ -3368,6 +3374,321 @@ async function excluirConta() {
 window.mostrarPerfil = mostrarPerfil;
 window.salvarPerfilEmpresa = salvarPerfilEmpresa;
 window.confirmarExclusaoConta = confirmarExclusaoConta;
+
+// ==================== DASHBOARD ADMIN ====================
+function mostrarDashboardAdmin() {
+  // Verificar se é admin
+  if (!empresaAtual?.isAdmin) {
+    mostrarToast('❌ Acesso negado! Apenas administradores.', 'error');
+    return;
+  }
+  
+  document.getElementById('secaoEstoque').classList.add('hidden');
+  document.getElementById('secaoHistorico').classList.add('hidden');
+  document.getElementById('secaoCurvaABC').classList.add('hidden');
+  document.getElementById('secaoRelatorios').classList.add('hidden');
+  document.getElementById('secaoConfiguracoes').classList.add('hidden');
+  if (document.getElementById('secaoPerfil')) {
+    document.getElementById('secaoPerfil').classList.add('hidden');
+  }
+  
+  let secaoAdmin = document.getElementById('secaoAdmin');
+  if (!secaoAdmin) {
+    secaoAdmin = document.createElement('div');
+    secaoAdmin.id = 'secaoAdmin';
+    secaoAdmin.className = 'secao';
+    document.getElementById('conteudo').appendChild(secaoAdmin);
+  }
+  
+  secaoAdmin.classList.remove('hidden');
+  document.getElementById('pageTitle').textContent = 'Dashboard Admin';
+  carregarDashboardAdmin();
+}
+
+async function carregarDashboardAdmin() {
+  const secaoAdmin = document.getElementById('secaoAdmin');
+  
+  secaoAdmin.innerHTML = `
+    <div class="header-secao">
+      <h2>🛡️ Dashboard Administrativo</h2>
+    </div>
+    
+    <div id="adminLoading" style="text-align: center; padding: 40px;">
+      <div class="spinner"></div>
+      <p>Carregando dados...</p>
+    </div>
+    
+    <div id="adminContent" style="display: none;"></div>
+  `;
+  
+  try {
+    // Carregar todos os usuários
+    const snapshot = await db.collection('usuarios').get();
+    const usuarios = [];
+    
+    for (const doc of snapshot.docs) {
+      const dados = doc.data();
+      
+      // Contar produtos do usuário
+      let totalProdutos = 0;
+      try {
+        const estoqueSnapshot = await db.collection('usuarios').doc(doc.id).collection('estoque').get();
+        totalProdutos = estoqueSnapshot.size;
+      } catch (e) {
+        console.warn('Erro ao contar produtos:', e);
+      }
+      
+      usuarios.push({
+        uid: doc.id,
+        nomeEmpresa: dados.nomeEmpresa || 'Sem nome',
+        email: dados.email || 'Sem email',
+        plano: dados.plano || 'gratuito',
+        isAdmin: dados.isAdmin || false,
+        dataCriacao: dados.dataCriacao?.toDate() || new Date(),
+        totalProdutos: totalProdutos
+      });
+    }
+    
+    // Ordenar por data de criação (mais recentes primeiro)
+    usuarios.sort((a, b) => b.dataCriacao - a.dataCriacao);
+    
+    renderizarDashboardAdmin(usuarios);
+    
+  } catch (error) {
+    console.error('Erro ao carregar dashboard admin:', error);
+    secaoAdmin.innerHTML = `
+      <div class="header-secao">
+        <h2>🛡️ Dashboard Administrativo</h2>
+      </div>
+      <div style="text-align: center; padding: 40px; color: #f44336;">
+        <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+        <p>❌ Erro ao carregar dados do dashboard</p>
+      </div>
+    `;
+  }
+}
+
+function renderizarDashboardAdmin(usuarios) {
+  const secaoAdmin = document.getElementById('secaoAdmin');
+  
+  // Calcular métricas
+  const totalUsuarios = usuarios.length;
+  const usuariosGratuito = usuarios.filter(u => u.plano === 'gratuito').length;
+  const usuariosBasico = usuarios.filter(u => u.plano === 'basico').length;
+  const usuariosProfissional = usuarios.filter(u => u.plano === 'profissional').length;
+  const receitaMensal = (usuariosBasico * 29.90) + (usuariosProfissional * 79.90);
+  const totalProdutos = usuarios.reduce((sum, u) => sum + u.totalProdutos, 0);
+  
+  document.getElementById('adminLoading').style.display = 'none';
+  document.getElementById('adminContent').style.display = 'block';
+  
+  document.getElementById('adminContent').innerHTML = `
+    <!-- Métricas Gerais -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+      <div class="card" style="padding: 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <div style="font-size: 36px; font-weight: 700; margin-bottom: 8px;">${totalUsuarios}</div>
+        <div style="font-size: 14px; opacity: 0.9;">Total de Clientes</div>
+      </div>
+      
+      <div class="card" style="padding: 20px; text-align: center; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+        <div style="font-size: 36px; font-weight: 700; margin-bottom: 8px;">R$ ${receitaMensal.toFixed(2)}</div>
+        <div style="font-size: 14px; opacity: 0.9;">Receita Mensal</div>
+      </div>
+      
+      <div class="card" style="padding: 20px; text-align: center; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+        <div style="font-size: 36px; font-weight: 700; margin-bottom: 8px;">${totalProdutos.toLocaleString()}</div>
+        <div style="font-size: 14px; opacity: 0.9;">Produtos Cadastrados</div>
+      </div>
+      
+      <div class="card" style="padding: 20px; text-align: center; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white;">
+        <div style="font-size: 36px; font-weight: 700; margin-bottom: 8px;">${usuariosBasico + usuariosProfissional}</div>
+        <div style="font-size: 14px; opacity: 0.9;">Clientes Pagantes</div>
+      </div>
+    </div>
+    
+    <!-- Distribuição de Planos -->
+    <div class="card" style="padding: 24px; margin-bottom: 30px;">
+      <h3 style="margin-bottom: 20px;">📊 Distribuição de Planos</h3>
+      <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 200px; padding: 16px; background: #f5f5f5; border-radius: 8px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 50px; height: 50px; background: #9e9e9e; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">🆓</div>
+            <div>
+              <div style="font-size: 24px; font-weight: 600;">${usuariosGratuito}</div>
+              <div style="color: #666; font-size: 14px;">Gratuito</div>
+            </div>
+          </div>
+        </div>
+        
+        <div style="flex: 1; min-width: 200px; padding: 16px; background: #E3F2FD; border-radius: 8px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 50px; height: 50px; background: #2196F3; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">💼</div>
+            <div>
+              <div style="font-size: 24px; font-weight: 600;">${usuariosBasico}</div>
+              <div style="color: #1565C0; font-size: 14px;">Básico (R$ 29,90)</div>
+            </div>
+          </div>
+        </div>
+        
+        <div style="flex: 1; min-width: 200px; padding: 16px; background: #E8F5E9; border-radius: 8px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 50px; height: 50px; background: #4CAF50; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">🏢</div>
+            <div>
+              <div style="font-size: 24px; font-weight: 600;">${usuariosProfissional}</div>
+              <div style="color: #2E7D32; font-size: 14px;">Profissional (R$ 79,90)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Filtros -->
+    <div class="card" style="padding: 20px; margin-bottom: 20px;">
+      <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center;">
+        <input type="text" id="filtroNome" placeholder="🔍 Buscar por nome ou email..." 
+               style="flex: 1; min-width: 250px; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"
+               onkeyup="filtrarUsuariosAdmin()">
+        
+        <select id="filtroPlano" onchange="filtrarUsuariosAdmin()"
+                style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer;">
+          <option value="">Todos os planos</option>
+          <option value="gratuito">🆓 Gratuito</option>
+          <option value="basico">💼 Básico</option>
+          <option value="profissional">🏢 Profissional</option>
+        </select>
+        
+        <button onclick="carregarDashboardAdmin()" class="btn-secondary" style="padding: 10px 20px;">
+          <i class="fas fa-sync-alt"></i> Atualizar
+        </button>
+      </div>
+    </div>
+    
+    <!-- Lista de Usuários -->
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div style="padding: 20px; background: #f9fafb; border-bottom: 1px solid #e5e7eb;">
+        <h3 style="margin: 0;">👥 Clientes (${totalUsuarios})</h3>
+      </div>
+      
+      <div style="overflow-x: auto;">
+        <table id="tabelaUsuariosAdmin" style="width: 100%; border-collapse: collapse;">
+          <thead style="background: #f9fafb;">
+            <tr>
+              <th style="padding: 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Empresa</th>
+              <th style="padding: 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Email</th>
+              <th style="padding: 12px; text-align: center; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Plano</th>
+              <th style="padding: 12px; text-align: center; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Produtos</th>
+              <th style="padding: 12px; text-align: center; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Data Cadastro</th>
+              <th style="padding: 12px; text-align: center; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="corpoTabelaUsuarios">
+            ${usuarios.map(u => `
+              <tr class="linha-usuario" data-nome="${u.nomeEmpresa.toLowerCase()}" data-email="${u.email.toLowerCase()}" data-plano="${u.plano}" style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 16px;">
+                  <div style="font-weight: 600;">${u.nomeEmpresa}</div>
+                  ${u.isAdmin ? '<span style="font-size: 11px; background: #fbbf24; color: #78350f; padding: 2px 6px; border-radius: 4px; font-weight: 600;">ADMIN</span>' : ''}
+                </td>
+                <td style="padding: 16px; color: #6b7280;">${u.email}</td>
+                <td style="padding: 16px; text-align: center;">
+                  ${u.plano === 'gratuito' ? '<span style="background: #e0e0e0; color: #424242; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;">🆓 Gratuito</span>' : ''}
+                  ${u.plano === 'basico' ? '<span style="background: #E3F2FD; color: #1565C0; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;">💼 Básico</span>' : ''}
+                  ${u.plano === 'profissional' ? '<span style="background: #E8F5E9; color: #2E7D32; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;">🏢 Profissional</span>' : ''}
+                </td>
+                <td style="padding: 16px; text-align: center; font-weight: 600;">${u.totalProdutos}</td>
+                <td style="padding: 16px; text-align: center; color: #6b7280; font-size: 13px;">${u.dataCriacao.toLocaleDateString('pt-BR')}</td>
+                <td style="padding: 16px; text-align: center;">
+                  <button onclick="gerenciarCliente('${u.uid}')" class="btn-primary" style="padding: 6px 12px; font-size: 13px;">
+                    <i class="fas fa-cog"></i> Gerenciar
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function filtrarUsuariosAdmin() {
+  const filtroNome = document.getElementById('filtroNome').value.toLowerCase();
+  const filtroPlano = document.getElementById('filtroPlano').value;
+  
+  const linhas = document.querySelectorAll('.linha-usuario');
+  
+  linhas.forEach(linha => {
+    const nome = linha.getAttribute('data-nome');
+    const email = linha.getAttribute('data-email');
+    const plano = linha.getAttribute('data-plano');
+    
+    const matchNome = !filtroNome || nome.includes(filtroNome) || email.includes(filtroNome);
+    const matchPlano = !filtroPlano || plano === filtroPlano;
+    
+    if (matchNome && matchPlano) {
+      linha.style.display = '';
+    } else {
+      linha.style.display = 'none';
+    }
+  });
+}
+
+async function gerenciarCliente(uid) {
+  try {
+    // Buscar dados atualizados do cliente
+    const clienteDoc = await db.collection('usuarios').doc(uid).get();
+    if (!clienteDoc.exists) {
+      mostrarToast('❌ Cliente não encontrado!', 'error');
+      return;
+    }
+    
+    const cliente = clienteDoc.data();
+    const nomeEmpresa = cliente.nomeEmpresa || 'Sem nome';
+    const email = cliente.email || 'Sem email';
+    const planoAtual = cliente.plano || 'gratuito';
+    
+    // Contar produtos
+    const estoqueSnapshot = await db.collection('usuarios').doc(uid).collection('estoque').get();
+    const totalProdutos = estoqueSnapshot.size;
+    
+    const novoPlano = prompt(
+      `🛠️ GERENCIAR CLIENTE\n\n` +
+      `Empresa: ${nomeEmpresa}\n` +
+      `Email: ${email}\n` +
+      `Plano Atual: ${planoAtual.toUpperCase()}\n` +
+      `Produtos: ${totalProdutos}\n\n` +
+      `Digite o novo plano (gratuito, basico ou profissional):\n` +
+      `Ou deixe vazio para cancelar.`,
+      planoAtual
+    );
+    
+    if (!novoPlano || novoPlano === planoAtual) {
+      return;
+    }
+    
+    if (!['gratuito', 'basico', 'profissional'].includes(novoPlano.toLowerCase())) {
+      mostrarToast('❌ Plano inválido! Use: gratuito, basico ou profissional', 'error');
+      return;
+    }
+    
+    // Atualizar plano
+    await db.collection('usuarios').doc(uid).update({
+      plano: novoPlano.toLowerCase()
+    });
+    
+    mostrarToast(`✅ Plano de ${nomeEmpresa} alterado para ${novoPlano.toUpperCase()}!`, 'success');
+    
+    // Recarregar dashboard
+    carregarDashboardAdmin();
+    
+  } catch (error) {
+    console.error('Erro ao gerenciar cliente:', error);
+    mostrarToast('❌ Erro ao gerenciar cliente', 'error');
+  }
+}
+
+window.mostrarDashboardAdmin = mostrarDashboardAdmin;
+window.filtrarUsuariosAdmin = filtrarUsuariosAdmin;
+window.gerenciarCliente = gerenciarCliente;
 
 // Expor funções globalmente
 window.adicionarLocal = adicionarLocal;
