@@ -3129,17 +3129,20 @@ async function verificarLimitePlano() {
 
 // ==================== PERFIL DA EMPRESA ====================
 function mostrarPerfil() {
-  const secoes = ['secaoEstoque', 'secaoHistorico', 'secaoCurvaABC', 'secaoRelatorios', 'secaoConfiguracoes'];
-  secoes.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.classList.add('hidden');
+  // Esconder todas as telas
+  document.querySelectorAll('.tela').forEach(t => {
+    if (t.id !== 'login') {
+      t.style.display = 'none';
+    }
   });
   
+  // Buscar ou criar seção de perfil
   let secaoPerfil = document.getElementById('secaoPerfil');
   if (!secaoPerfil) {
-    secaoPerfil = document.createElement('div');
+    secaoPerfil = document.createElement('section');
     secaoPerfil.id = 'secaoPerfil';
-    secaoPerfil.className = 'secao';
+    secaoPerfil.className = 'tela';
+    secaoPerfil.style.display = 'none';
     const contentWrapper = document.querySelector('.content-wrapper');
     if (contentWrapper) {
       contentWrapper.appendChild(secaoPerfil);
@@ -3149,7 +3152,14 @@ function mostrarPerfil() {
     }
   }
   
-  secaoPerfil.classList.remove('hidden');
+  // Mostrar seção de perfil
+  secaoPerfil.style.display = 'block';
+  
+  // Atualizar título
+  const pageTitle = document.getElementById('pageTitle');
+  if (pageTitle) pageTitle.textContent = 'Perfil da Empresa';
+  
+  // Renderizar conteúdo
   renderizarPerfil();
 }
 
@@ -3393,24 +3403,32 @@ function mostrarDashboardAdmin() {
     return;
   }
   
-  const secoes = ['secaoEstoque', 'secaoHistorico', 'secaoCurvaABC', 'secaoRelatorios', 'secaoConfiguracoes', 'secaoPerfil'];
-  secoes.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.classList.add('hidden');
+  // Esconder todas as telas
+  document.querySelectorAll('.tela').forEach(t => {
+    if (t.id !== 'login') {
+      t.style.display = 'none';
+    }
   });
   
+  // Buscar ou criar seção admin
   let secaoAdmin = document.getElementById('secaoAdmin');
   if (!secaoAdmin) {
-    secaoAdmin = document.createElement('div');
+    secaoAdmin = document.createElement('section');
     secaoAdmin.id = 'secaoAdmin';
-    secaoAdmin.className = 'secao';
+    secaoAdmin.className = 'tela';
+    secaoAdmin.style.display = 'none';
     const contentWrapper = document.querySelector('.content-wrapper');
     if (contentWrapper) contentWrapper.appendChild(secaoAdmin);
   }
   
-  secaoAdmin.classList.remove('hidden');
+  // Mostrar seção admin
+  secaoAdmin.style.display = 'block';
+  
+  // Atualizar título
   const pageTitle = document.getElementById('pageTitle');
   if (pageTitle) pageTitle.textContent = 'Dashboard Admin';
+  
+  // Carregar dashboard
   carregarDashboardAdmin();
 }
 
