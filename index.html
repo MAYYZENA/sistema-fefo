@@ -85,53 +85,53 @@
     <li class="nav-item">
       <a href="#" onclick="abrir('menu')" class="nav-link active">
         <i class="fas fa-home"></i>
-        Dashboard
+        <span>Dashboard</span>
       </a>
     </li>
     <li class="nav-item">
       <a href="#" onclick="abrir('estoque')" class="nav-link">
         <i class="fas fa-boxes"></i>
-        Estoque
+        <span>Estoque</span>
       </a>
     </li>
     <li class="nav-item">
       <a href="#" onclick="abrir('curvaABC')" class="nav-link">
         <i class="fas fa-chart-line"></i>
-        Curva ABC
+        <span>Curva ABC</span>
       </a>
     </li>
     <li class="nav-item">
       <a href="#" onclick="abrir('historico')" class="nav-link">
         <i class="fas fa-history"></i>
-        Histórico
+        <span>Histórico</span>
       </a>
     </li>
     <li class="nav-item">
       <a href="#" onclick="abrir('locais')" class="nav-link">
         <i class="fas fa-map-marker-alt"></i>
-        Locais
+        <span>Locais</span>
       </a>
     </li>
     <li class="nav-item" id="menuUsuarios">
       <a href="#" onclick="abrir('usuarios')" class="nav-link">
         <i class="fas fa-users"></i>
-        Usuários
+        <span>Usuários</span>
       </a>
     </li>
   </ul>
   <div class="sidebar-footer">
     <button class="btn btn-secondary w-100" onclick="logout()">
       <i class="fas fa-sign-out-alt"></i>
-      Sair
+      <span>Sair</span>
     </button>
   </div>
 </aside>
 
 <!-- ==================== MAIN CONTENT ==================== -->
-<div class="main-content d-none" id="mainContent">  <!-- Botão Menu Mobile -->
-  <button class="btn-menu-mobile" id="btnMenuMobile" onclick="toggleSidebar()">
-    <i class="fas fa-bars"></i>
-  </button>  <div class="topbar">
+<div class="main-content d-none" id="mainContent">  <div class="topbar">
+    <button class="btn-toggle-sidebar" onclick="toggleSidebar()">
+      <i class="fas fa-bars"></i>
+    </button>
     <h1 class="topbar-title" id="pageTitle">Dashboard</h1>
     <div class="topbar-actions">
       <div class="user-badge">

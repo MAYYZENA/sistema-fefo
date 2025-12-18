@@ -107,22 +107,25 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   }
 
   // ================ CONTROLE DE TELAS ================
-  // Toggle sidebar em mobile
+  // Toggle sidebar (desktop e mobile)
   window.toggleSidebar = function() {
     const sidebar = document.getElementById('sidebar');
-    if (sidebar) {
-      sidebar.classList.toggle('active');
+    const mainContent = document.getElementById('mainContent');
+    
+    if (sidebar && mainContent) {
+      sidebar.classList.toggle('collapsed');
+      mainContent.classList.toggle('sidebar-collapsed');
     }
   }
 
   // Fechar sidebar ao clicar fora (mobile)
   document.addEventListener('click', function(e) {
     const sidebar = document.getElementById('sidebar');
-    const btnMenu = document.getElementById('btnMenuMobile');
+    const btnToggle = document.querySelector('.btn-toggle-sidebar');
     
-    if (window.innerWidth <= 768 && sidebar && sidebar.classList.contains('active')) {
-      if (!sidebar.contains(e.target) && !btnMenu.contains(e.target)) {
-        sidebar.classList.remove('active');
+    if (window.innerWidth <= 768 && sidebar && !sidebar.classList.contains('collapsed')) {
+      if (!sidebar.contains(e.target) && !btnToggle?.contains(e.target)) {
+        sidebar.classList.add('collapsed');
       }
     }
   });
@@ -133,7 +136,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     // Fechar sidebar em mobile após clicar no menu
     if (window.innerWidth <= 768) {
       const sidebar = document.getElementById('sidebar');
-      if (sidebar) sidebar.classList.remove('active');
+      if (sidebar) sidebar.classList.add('collapsed');
     }
     
     // Esconde todas as telas (exceto login)
