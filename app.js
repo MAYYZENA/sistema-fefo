@@ -3140,7 +3140,13 @@ function mostrarPerfil() {
     secaoPerfil = document.createElement('div');
     secaoPerfil.id = 'secaoPerfil';
     secaoPerfil.className = 'secao';
-    document.getElementById('conteudo').appendChild(secaoPerfil);
+    const conteudo = document.getElementById('conteudo');
+    if (conteudo) {
+      conteudo.appendChild(secaoPerfil);
+    } else {
+      console.error('Elemento conteudo não encontrado');
+      return;
+    }
   }
   
   secaoPerfil.classList.remove('hidden');
