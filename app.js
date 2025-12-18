@@ -1571,43 +1571,41 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     try {
       mostrarLoader(true);
       const tbody = document.getElementById('tabelaCurvaABCBody');
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center">Carregando...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center">Carregando...</td></tr>';
       
       const snap = await db.collection('estoque').get();
       let produtos = [];
-      let valorTotal = 0;
+      let quantidadeTotal = 0;
       
-      // Coletar produtos e calcular valor total
+      // Coletar produtos e calcular quantidade total
       snap.forEach(doc => {
         const p = doc.data();
-        const valorItem = (p.quantidade || 0) * (p.preco || 0);
+        const qtd = p.quantidade || 0;
         produtos.push({
           id: doc.id,
           nome: p.nome || 'Sem nome',
           marca: p.marca || '',
-          quantidade: p.quantidade || 0,
-          preco: p.preco || 0,
-          valorTotal: valorItem
+          quantidade: qtd
         });
-        valorTotal += valorItem;
+        quantidadeTotal += qtd;
       });
       
       if (produtos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding: 40px;"><i class="fas fa-inbox" style="font-size: 48px; opacity: 0.3; display: block; margin-bottom: 16px;"></i>Nenhum produto no estoque</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="padding: 40px;"><i class="fas fa-inbox" style="font-size: 48px; opacity: 0.3; display: block; margin-bottom: 16px;"></i>Nenhum produto no estoque</td></tr>';
         mostrarLoader(false);
         return;
       }
       
-      // Ordenar por valor total (decrescente)
-      produtos.sort((a, b) => b.valorTotal - a.valorTotal);
+      // Ordenar por quantidade (decrescente)
+      produtos.sort((a, b) => b.quantidade - a.quantidade);
       
       // Classificar em curvas A, B, C
-      let valorAcumulado = 0;
+      let quantidadeAcumulada = 0;
       let countA = 0, countB = 0, countC = 0;
       
       produtos.forEach(p => {
-        valorAcumulado += p.valorTotal;
-        const percentualAcumulado = (valorAcumulado / valorTotal) * 100;
+        quantidadeAcumulada += p.quantidade;
+        const percentualAcumulado = (quantidadeAcumulada / quantidadeTotal) * 100;
         
         if (percentualAcumulado <= 80) {
           p.curva = 'A';
@@ -1628,21 +1626,13 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       document.getElementById('countB').textContent = countB;
       document.getElementById('countC').textContent = countC;
       
+      // Salvar globalmente para filtros
+      produtosCurvaABC = produtos;
+      
       // Preencher tabela
       tbody.innerHTML = '';
       produtos.forEach(p => {
-        const curvaClass = p.curva === 'A' ? 'success' : p.curva === 'B' ? 'warning' : 'secondary';
-        const row = `
-          <tr>
-            <td><span class="badge badge-${curvaClass}">${p.curva}</span></td>
-            <td>${p.nome}${p.marca ? ' - ' + p.marca : ''}</td>
-            <td>${p.quantidade}</td>
-            <td>R$ ${p.preco.toFixed(2)}</td>
-            <td><strong>R$ ${p.valorTotal.toFixed(2)}</strong></td>
-            <td>${p.percentualAcumulado.toFixed(1)}%</td>
-          </tr>
-        `;
-        tbody.innerHTML += row;
+        tbody.innerHTML += criarLinhaTabela(p);
       });
       
       // Desenhar gráfico
@@ -1654,6 +1644,9 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       mostrarLoader(false);
     }
   }
+
+  // Variável global para armazenar produtos da curva ABC
+  let produtosCurvaABC = [];
 
   function desenharGraficoABC(countA, countB, countC, produtos) {
     if (graficoABC) graficoABC.destroy();
@@ -1712,6 +1705,102 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
         }
       }
     });
+  }
+
+  // Filtrar tabela por classificação
+  function filtrarCurva(curva) {
+    const tbody = document.getElementById('tabelaCurvaABCBody');
+    const badge = document.getElementById('filtroAtivo');
+    const busca = document.getElementById('buscaCurva');
+    
+    // Limpar busca
+    if (busca) busca.value = '';
+    
+    if (curva === 'TODAS') {
+      // Mostrar todos
+      tbody.innerHTML = '';
+      produtosCurvaABC.forEach(p => {
+        tbody.innerHTML += criarLinhaTabela(p);
+      });
+      badge.textContent = 'Todas as classificações';
+      badge.style.background = '#6b7280';
+    } else {
+      // Filtrar por curva
+      const filtrados = produtosCurvaABC.filter(p => p.curva === curva);
+      tbody.innerHTML = '';
+      filtrados.forEach(p => {
+        tbody.innerHTML += criarLinhaTabela(p);
+      });
+      
+      const cores = { 'A': '#10b981', 'B': '#f59e0b', 'C': '#6b7280' };
+      const labels = { 'A': 'Alta Prioridade', 'B': 'Média Prioridade', 'C': 'Baixa Prioridade' };
+      badge.textContent = `Curva ${curva} - ${labels[curva]}`;
+      badge.style.background = cores[curva];
+    }
+  }
+
+  // Buscar na tabela
+  function buscarNaCurva() {
+    const busca = document.getElementById('buscaCurva').value.toLowerCase();
+    const tbody = document.getElementById('tabelaCurvaABCBody');
+    
+    if (!busca) {
+      // Se vazio, mostrar todos
+      filtrarCurva('TODAS');
+      return;
+    }
+    
+    const filtrados = produtosCurvaABC.filter(p => {
+      const nomeMarca = `${p.nome} ${p.marca}`.toLowerCase();
+      return nomeMarca.includes(busca);
+    });
+    
+    tbody.innerHTML = '';
+    if (filtrados.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="padding: 24px; color: var(--text-secondary);">Nenhum produto encontrado</td></tr>';
+    } else {
+      filtrados.forEach(p => {
+        tbody.innerHTML += criarLinhaTabela(p);
+      });
+    }
+    
+    const badge = document.getElementById('filtroAtivo');
+    badge.textContent = `${filtrados.length} produto(s) encontrado(s)`;
+    badge.style.background = '#1a73e8';
+  }
+
+  // Toggle gráfico
+  function toggleGrafico() {
+    const card = document.getElementById('cardGraficoABC');
+    if (card.style.display === 'none') {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  }
+
+  // Criar linha da tabela com badges coloridos
+  function criarLinhaTabela(p) {
+    const cores = {
+      'A': { bg: '#d1fae5', color: '#065f46', badge: 'success' },
+      'B': { bg: '#fef3c7', color: '#92400e', badge: 'warning' },
+      'C': { bg: '#f3f4f6', color: '#374151', badge: 'secondary' }
+    };
+    
+    const estilo = cores[p.curva];
+    
+    return `
+      <tr style="background: ${estilo.bg};">
+        <td>
+          <span class="badge badge-${estilo.badge}" style="font-size: 14px; padding: 6px 12px;">
+            ${p.curva}
+          </span>
+        </td>
+        <td style="color: ${estilo.color}; font-weight: 500;">${p.nome}${p.marca ? ' - ' + p.marca : ''}</td>
+        <td style="text-align: right; color: ${estilo.color}; font-weight: 600;">${p.quantidade}</td>
+        <td style="text-align: right; color: ${estilo.color};">${p.percentualAcumulado.toFixed(1)}%</td>
+      </tr>
+    `;
   }
 
   // ================ SESSÃO ================
