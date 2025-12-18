@@ -1,0 +1,92 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ======================================
+    // REGRAS DE SEGURANÇA - SISTEMA FEFO
+    // ======================================
+    
+    // Função auxiliar: Verificar se é admin
+    function isAdmin() {
+      return request.auth != null && 
+             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    // Função auxiliar: Verificar se é o próprio usuário
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    
+    // ======================================
+    // COLEÇÃO DE USUÁRIOS
+    // ======================================
+    match /usuarios/{userId} {
+      // Leitura:
+      // - Admin pode ler qualquer usuário
+      // - Usuário pode ler apenas seus próprios dados
+      allow read: if isAdmin() || isOwner(userId);
+      
+      // Criação:
+      // - Qualquer usuário autenticado pode criar seu próprio documento
+      // - Apenas na primeira vez (após login)
+      allow create: if request.auth != null && 
+                       request.auth.uid == userId &&
+                       !exists(/databases/$(database)/documents/usuarios/$(userId));
+      
+      // Atualização:
+      // - Admin pode alterar qualquer usuário (incluindo planos e permissões)
+      // - Usuário pode alterar apenas seus dados (exceto isAdmin e plano)
+      allow update: if isAdmin() ||
+                       (isOwner(userId) && 
+                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'plano']));
+      
+      // Exclusão:
+      // - Admin pode excluir qualquer usuário
+      // - Usuário pode excluir apenas sua própria conta
+      allow delete: if isAdmin() || isOwner(userId);
+      
+      // ======================================
+      // SUBCOLEÇÕES DO USUÁRIO
+      // ======================================
+      match /estoque/{produtoId} {
+        // Apenas o dono pode acessar seu estoque
+        // Admin NÃO pode acessar estoque (privacidade)
+        allow read, write: if isOwner(userId);
+      }
+      
+      match /movimentacoes/{movimentacaoId} {
+        // Apenas o dono pode acessar suas movimentações
+        allow read, write: if isOwner(userId);
+      }
+      
+      match /relatorios/{relatorioId} {
+        // Apenas o dono pode acessar seus relatórios
+        allow read, write: if isOwner(userId);
+      }
+    }
+    
+    // ======================================
+    // LOGS DE AUDITORIA (APENAS ADMIN)
+    // ======================================
+    match /auditoria/{logId} {
+      allow read: if isAdmin();
+      allow write: if false; // Apenas funções do servidor podem escrever
+    }
+    
+    // ======================================
+    // CONFIGURAÇÕES GLOBAIS (APENAS ADMIN)
+    // ======================================
+    match /configuracoes/{configId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    
+    // ======================================
+    // BLOQUEAR QUALQUER OUTRA COLEÇÃO
+    // ======================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

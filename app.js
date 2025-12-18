@@ -246,6 +246,15 @@ function getCollection(collectionName) {
       if (empresaDoc.exists) {
         empresaAtual = empresaDoc.data();
         console.log('📦 Dados carregados do Firebase:', empresaAtual);
+        
+        // VERIFICAR SE CONTA ESTÁ SUSPENSA
+        if (empresaAtual.status === 'suspenso') {
+          console.error('🚫 Conta suspensa!');
+          await auth.signOut();
+          mostrarToast('⛔ Sua conta foi suspensa. Entre em contato com o suporte.', 'error');
+          return;
+        }
+        
         usuarioAtual = {
           uid: user.uid,
           email: user.email,
@@ -3419,11 +3428,16 @@ window.confirmarExclusaoConta = confirmarExclusaoConta;
 
 // ==================== DASHBOARD ADMIN ====================
 function mostrarDashboardAdmin() {
-  // Verificar se é admin
-  if (!empresaAtual?.isAdmin) {
+  // Verificação de segurança rigorosa
+  if (!empresaAtual?.isAdmin || empresaAtual.isAdmin !== true) {
+    console.warn('🚫 Tentativa de acesso ao dashboard admin sem permissão!');
     mostrarToast('❌ Acesso negado! Apenas administradores.', 'error');
+    abrir('produtos'); // Redirecionar para tela de produtos
     return;
   }
+  
+  // Log de acesso admin (auditoria)
+  console.log('🛡️ Acesso ao dashboard admin:', empresaAtual.nomeEmpresa);
   
   // Esconder todas as telas
   document.querySelectorAll('.tela').forEach(t => {
@@ -3455,23 +3469,34 @@ function mostrarDashboardAdmin() {
 }
 
 async function carregarDashboardAdmin() {
+  // Dupla verificação de segurança
+  if (!empresaAtual?.isAdmin || empresaAtual.isAdmin !== true) {
+    console.error('🚫 Tentativa de carregar dashboard sem permissão!');
+    mostrarToast('❌ Acesso negado!', 'error');
+    abrir('produtos');
+    return;
+  }
+  
   const secaoAdmin = document.getElementById('secaoAdmin');
   
   secaoAdmin.innerHTML = `
     <div class="header-secao">
       <h2>🛡️ Dashboard Administrativo</h2>
+      <div style="font-size: 12px; color: #666; margin-top: 8px;">
+        <i class="fas fa-shield-alt"></i> Modo Administrador - Acesso Restrito
+      </div>
     </div>
     
     <div id="adminLoading" style="text-align: center; padding: 40px;">
       <div class="spinner"></div>
-      <p>Carregando dados...</p>
+      <p>Carregando dados de todos os clientes...</p>
     </div>
     
     <div id="adminContent" style="display: none;"></div>
   `;
   
   try {
-    // Carregar todos os usuários
+    // Carregar todos os usuários (apenas admin tem permissão)
     const snapshot = await db.collection('usuarios').get();
     const usuarios = [];
     
@@ -3494,7 +3519,9 @@ async function carregarDashboardAdmin() {
         plano: dados.plano || 'gratuito',
         isAdmin: dados.isAdmin || false,
         dataCriacao: dados.dataCriacao?.toDate() || new Date(),
-        totalProdutos: totalProdutos
+        totalProdutos: totalProdutos,
+        ultimoAcesso: dados.ultimoAcesso?.toDate() || null,
+        status: dados.status || 'ativo'
       });
     }
     
@@ -3682,6 +3709,18 @@ function filtrarUsuariosAdmin() {
 }
 
 async function gerenciarCliente(uid) {
+  // Verificação de segurança
+  if (!empresaAtual?.isAdmin || empresaAtual.isAdmin !== true) {
+    mostrarToast('❌ Acesso negado!', 'error');
+    return;
+  }
+  
+  // Impedir que admin gerencie a si mesmo
+  if (uid === usuarioAtual?.uid) {
+    mostrarToast('⚠️ Você não pode gerenciar sua própria conta!', 'warning');
+    return;
+  }
+  
   try {
     // Buscar dados atualizados do cliente
     const clienteDoc = await db.collection('usuarios').doc(uid).get();
@@ -3695,43 +3734,150 @@ async function gerenciarCliente(uid) {
     const email = cliente.email || 'Sem email';
     const planoAtual = cliente.plano || 'gratuito';
     
+    // Impedir gerenciar outros admins
+    if (cliente.isAdmin) {
+      mostrarToast('⚠️ Você não pode gerenciar outro administrador!', 'warning');
+      return;
+    }
+    
     // Contar produtos
-    const estoqueSnapshot = await db.collection('usuarios').doc(uid).collection('estoque').get();
-    const totalProdutos = estoqueSnapshot.size;
-    
-    const novoPlano = prompt(
-      `🛠️ GERENCIAR CLIENTE\n\n` +
-      `Empresa: ${nomeEmpresa}\n` +
-      `Email: ${email}\n` +
-      `Plano Atual: ${planoAtual.toUpperCase()}\n` +
-      `Produtos: ${totalProdutos}\n\n` +
-      `Digite o novo plano (gratuito, basico ou profissional):\n` +
-      `Ou deixe vazio para cancelar.`,
-      planoAtual
-    );
-    
-    if (!novoPlano || novoPlano === planoAtual) {
-      return;
+    let totalProdutos = 0;
+    try {
+      const estoqueSnapshot = await db.collection('usuarios').doc(uid).collection('estoque').get();
+      totalProdutos = estoqueSnapshot.size;
+    } catch (e) {
+      console.warn('Aviso: Não foi possível contar produtos (privacidade)');
     }
     
-    if (!['gratuito', 'basico', 'profissional'].includes(novoPlano.toLowerCase())) {
-      mostrarToast('❌ Plano inválido! Use: gratuito, basico ou profissional', 'error');
-      return;
-    }
+    // Modal melhorado
+    const modal = document.createElement('div');
+    modal.id = 'modalGerenciarCliente';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
     
-    // Atualizar plano
-    await db.collection('usuarios').doc(uid).update({
-      plano: novoPlano.toLowerCase()
+    modal.innerHTML = `
+      <div style="background: white; border-radius: 12px; padding: 32px; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <h2 style="margin: 0 0 24px 0; color: #1976d2;">
+          <i class="fas fa-user-cog"></i> Gerenciar Cliente
+        </h2>
+        
+        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
+          <div style="margin-bottom: 12px;">
+            <strong>Empresa:</strong> ${nomeEmpresa}
+          </div>
+          <div style="margin-bottom: 12px;">
+            <strong>Email:</strong> ${email}
+          </div>
+          <div style="margin-bottom: 12px;">
+            <strong>Produtos:</strong> ${totalProdutos || 'Privado'}
+          </div>
+          <div>
+            <strong>Plano Atual:</strong> 
+            <span style="background: ${planoAtual === 'profissional' ? '#4CAF50' : planoAtual === 'basico' ? '#2196F3' : '#9E9E9E'}; color: white; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;">
+              ${planoAtual.toUpperCase()}
+            </span>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 24px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">
+            <i class="fas fa-crown"></i> Novo Plano:
+          </label>
+          <select id="selectNovoPlano" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 15px; cursor: pointer;">
+            <option value="gratuito" ${planoAtual === 'gratuito' ? 'selected' : ''}>🆓 Gratuito (50 produtos)</option>
+            <option value="basico" ${planoAtual === 'basico' ? 'selected' : ''}>💼 Básico (500 produtos - R$ 29,90/mês)</option>
+            <option value="profissional" ${planoAtual === 'profissional' ? 'selected' : ''}>🏢 Profissional (Ilimitado - R$ 79,90/mês)</option>
+          </select>
+        </div>
+        
+        <div style="margin-bottom: 24px;">
+          <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="checkSuspenderConta" style="width: 18px; height: 18px; margin-right: 8px; cursor: pointer;">
+            <span style="color: #d32f2f; font-weight: 600;">⚠️ Suspender conta do cliente</span>
+          </label>
+          <p style="margin: 8px 0 0 26px; font-size: 13px; color: #666;">Cliente não poderá fazer login enquanto suspenso</p>
+        </div>
+        
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+          <button onclick="fecharModalGerenciar()" class="btn-secondary" style="padding: 12px 24px;">
+            <i class="fas fa-times"></i> Cancelar
+          </button>
+          <button onclick="salvarAlteracoesCliente('${uid}', '${planoAtual}')" class="btn-primary" style="padding: 12px 24px;">
+            <i class="fas fa-check"></i> Salvar Alterações
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Fechar ao clicar fora
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        fecharModalGerenciar();
+      }
     });
-    
-    mostrarToast(`✅ Plano de ${nomeEmpresa} alterado para ${novoPlano.toUpperCase()}!`, 'success');
-    
-    // Recarregar dashboard
-    carregarDashboardAdmin();
     
   } catch (error) {
     console.error('Erro ao gerenciar cliente:', error);
     mostrarToast('❌ Erro ao gerenciar cliente', 'error');
+  }
+}
+
+window.fecharModalGerenciar = function() {
+  const modal = document.getElementById('modalGerenciarCliente');
+  if (modal) modal.remove();
+}
+
+window.salvarAlteracoesCliente = async function(uid, planoAntigo) {
+  // Verificação de segurança
+  if (!empresaAtual?.isAdmin || empresaAtual.isAdmin !== true) {
+    mostrarToast('❌ Acesso negado!', 'error');
+    fecharModalGerenciar();
+    return;
+  }
+  
+  try {
+    const novoPlano = document.getElementById('selectNovoPlano').value;
+    const suspender = document.getElementById('checkSuspenderConta').checked;
+    
+    const updates = {
+      plano: novoPlano,
+      status: suspender ? 'suspenso' : 'ativo',
+      ultimaAlteracaoAdmin: firebase.firestore.FieldValue.serverTimestamp(),
+      alteradoPor: empresaAtual.nomeEmpresa || usuarioAtual.email
+    };
+    
+    // Atualizar no Firestore
+    await db.collection('usuarios').doc(uid).update(updates);
+    
+    // Log de auditoria
+    console.log('🔐 AUDITORIA: Admin alterou cliente', {
+      clienteUid: uid,
+      planoAntigo,
+      planoNovo: novoPlano,
+      suspenso: suspender,
+      adminUid: usuarioAtual.uid,
+      adminEmail: usuarioAtual.email,
+      timestamp: new Date()
+    });
+    
+    let mensagem = `✅ Cliente atualizado com sucesso!`;
+    if (planoAntigo !== novoPlano) {
+      mensagem += `\n📊 Plano: ${planoAntigo.toUpperCase()} → ${novoPlano.toUpperCase()}`;
+    }
+    if (suspender) {
+      mensagem += `\n⚠️ Conta SUSPENSA`;
+    }
+    
+    mostrarToast(mensagem, 'success');
+    fecharModalGerenciar();
+    
+    // Recarregar dashboard
+    setTimeout(() => carregarDashboardAdmin(), 500);
+    
+  } catch (error) {
+    console.error('Erro ao atualizar cliente:', error);
+    mostrarToast('❌ Erro ao atualizar cliente: ' + error.message, 'error');
   }
 }
 
