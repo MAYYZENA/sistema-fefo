@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recuperar Senha - Sistema FEFO</title>
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="vendor/fontawesome.min.css">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .card-recuperar {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 450px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    
+    .card-recuperar h1 {
+      font-size: 28px;
+      margin-bottom: 12px;
+      color: #1976d2;
+    }
+    
+    .card-recuperar p {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    
+    .form-group {
+      margin-bottom: 24px;
+    }
+    
+    .form-label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+    }
+    
+    .form-control {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 15px;
+      transition: all 0.3s;
+    }
+    
+    .form-control:focus {
+      outline: none;
+      border-color: #1976d2;
+      box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .btn-primary {
+      background: #1976d2;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #1565c0;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(25, 118, 210, 0.3);
+    }
+    
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #666;
+      margin-top: 12px;
+    }
+    
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+    
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    
+    .alert-success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #4caf50;
+    }
+    
+    .alert-error {
+      background: #ffebee;
+      color: #c62828;
+      border: 1px solid #f44336;
+    }
+    
+    .loader {
+      display: none;
+      text-align: center;
+      margin: 20px 0;
+    }
+    
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #1976d2;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="card-recuperar">
+  <h1><i class="fas fa-key"></i> Recuperar Senha</h1>
+  <p>Digite seu email e enviaremos instruções para redefinir sua senha.</p>
+  
+  <div id="alert" class="alert"></div>
+  
+  <form id="formRecuperar" onsubmit="return false;">
+    <div class="form-group">
+      <label for="emailRecuperar" class="form-label">
+        <i class="fas fa-envelope"></i> Email Cadastrado
+      </label>
+      <input 
+        id="emailRecuperar" 
+        class="form-control" 
+        type="email" 
+        placeholder="seu@email.com"
+        required
+        autocomplete="email">
+    </div>
+    
+    <button type="button" onclick="enviarRecuperacao()" class="btn btn-primary">
+      <i class="fas fa-paper-plane"></i>
+      Enviar Link de Recuperação
+    </button>
+    
+    <button type="button" onclick="voltarLogin()" class="btn btn-secondary">
+      <i class="fas fa-arrow-left"></i>
+      Voltar para Login
+    </button>
+  </form>
+  
+  <div id="loader" class="loader">
+    <div class="spinner"></div>
+    <p style="margin-top: 12px; color: #666;">Enviando...</p>
+  </div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+<script>
+  // Configuração do Firebase (mesma do app.js)
+  const firebaseConfig = {
+    apiKey: "AIzaSyANviF_XRJdTp4R-bqOY28FQn8jYPJRWyM",
+    authDomain: "sistema-fefo.firebaseapp.com",
+    projectId: "sistema-fefo",
+    storageBucket: "sistema-fefo.firebasestorage.app",
+    messagingSenderId: "1077183899308",
+    appId: "1:1077183899308:web:bd1095c0faf1d89dc7dca8"
+  };
+  
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  
+  function mostrarAlerta(mensagem, tipo) {
+    const alert = document.getElementById('alert');
+    alert.textContent = mensagem;
+    alert.className = `alert alert-${tipo}`;
+    alert.style.display = 'block';
+    
+    setTimeout(() => {
+      alert.style.display = 'none';
+    }, 6000);
+  }
+  
+  function mostrarLoader(show) {
+    document.getElementById('formRecuperar').style.display = show ? 'none' : 'block';
+    document.getElementById('loader').style.display = show ? 'block' : 'none';
+  }
+  
+  async function enviarRecuperacao() {
+    const email = document.getElementById('emailRecuperar').value.trim();
+    
+    // Validar email
+    if (!email) {
+      mostrarAlerta('⚠️ Digite seu email', 'error');
+      return;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      mostrarAlerta('⚠️ Email inválido', 'error');
+      return;
+    }
+    
+    try {
+      mostrarLoader(true);
+      
+      await auth.sendPasswordResetEmail(email, {
+        url: window.location.origin + '/index.html',
+        handleCodeInApp: false
+      });
+      
+      mostrarLoader(false);
+      mostrarAlerta('✅ Email de recuperação enviado! Verifique sua caixa de entrada (e spam).', 'success');
+      
+      // Limpar campo
+      document.getElementById('emailRecuperar').value = '';
+      
+      // Redirecionar após 3 segundos
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 3000);
+      
+    } catch (error) {
+      mostrarLoader(false);
+      console.error('Erro:', error);
+      
+      if (error.code === 'auth/user-not-found') {
+        // Por segurança, não revelar se email existe ou não
+        mostrarAlerta('✅ Se este email estiver cadastrado, você receberá instruções de recuperação.', 'success');
+      } else if (error.code === 'auth/invalid-email') {
+        mostrarAlerta('❌ Email inválido', 'error');
+      } else if (error.code === 'auth/too-many-requests') {
+        mostrarAlerta('❌ Muitas tentativas. Aguarde alguns minutos.', 'error');
+      } else {
+        mostrarAlerta('❌ Erro ao enviar email. Tente novamente.', 'error');
+      }
+    }
+  }
+  
+  function voltarLogin() {
+    window.location.href = 'index.html';
+  }
+  
+  // Enter para enviar
+  document.getElementById('emailRecuperar').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      enviarRecuperacao();
+    }
+  });
+</script>
+
+</body>
+</html>

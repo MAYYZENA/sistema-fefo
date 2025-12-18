@@ -68,6 +68,11 @@
         <label for="senha" class="form-label">Senha</label>
         <input id="senha" type="password" class="form-control" placeholder="Digite sua senha" autocomplete="current-password">
       </div>
+      <div style="text-align: right; margin-bottom: 16px;">
+        <a href="recuperar-senha.html" style="color: #1976d2; text-decoration: none; font-size: 14px;">
+          <i class="fas fa-key"></i> Esqueci minha senha
+        </a>
+      </div>
       <button type="button" class="btn btn-primary btn-lg w-100 mb-2" onclick="login()">
         <i class="fas fa-sign-in-alt"></i>
         Entrar
@@ -94,7 +99,16 @@
       </div>
       <div class="form-group">
         <label for="senhaRegistro" class="form-label">Senha *</label>
-        <input id="senhaRegistro" type="password" class="form-control" placeholder="Mínimo 6 caracteres" autocomplete="new-password" required>
+        <input id="senhaRegistro" type="password" class="form-control" placeholder="Mínimo 8 caracteres" autocomplete="new-password" required oninput="verificarForcaSenha()">
+        <div id="indicadorSenha" style="margin-top: 8px; display: none;">
+          <div style="display: flex; gap: 4px; margin-bottom: 4px;">
+            <div id="barra1" style="flex: 1; height: 4px; background: #e0e0e0; border-radius: 2px;"></div>
+            <div id="barra2" style="flex: 1; height: 4px; background: #e0e0e0; border-radius: 2px;"></div>
+            <div id="barra3" style="flex: 1; height: 4px; background: #e0e0e0; border-radius: 2px;"></div>
+            <div id="barra4" style="flex: 1; height: 4px; background: #e0e0e0; border-radius: 2px;"></div>
+          </div>
+          <p id="textoSenha" style="font-size: 12px; margin: 0; color: #666;"></p>
+        </div>
       </div>
       <button type="button" class="btn btn-success btn-lg w-100" onclick="registrar()">
         <i class="fas fa-check"></i>

@@ -68,6 +68,11 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
 let usuarioAtual = null;
 let empresaAtual = null;
 
+// Controle de segurança do login
+let tentativasLogin = 0;
+let bloqueioLogin = false;
+let tempoBloqueio = null;
+
 // Função auxiliar para obter caminho da coleção isolada por usuário
 function getCollection(collectionName) {
   if (!auth.currentUser) {
@@ -228,10 +233,38 @@ function getCollection(collectionName) {
 
   // ================ LOGIN ================
   async function login() {
+    // Verificar se está bloqueado
+    if (bloqueioLogin) {
+      const tempoRestante = Math.ceil((tempoBloqueio - Date.now()) / 1000);
+      if (tempoRestante > 0) {
+        mostrarToast(`🔒 Muitas tentativas. Aguarde ${tempoRestante}s`, 'error');
+        return;
+      } else {
+        // Desbloqueio automático
+        bloqueioLogin = false;
+        tentativasLogin = 0;
+      }
+    }
+    
     try {
-      const email = document.getElementById('email').value;
+      const email = document.getElementById('email').value.trim();
       const senha = document.getElementById('senha').value;
-      if (!email || !senha) { mostrarToast('Preencha email e senha', true); return; }
+      
+      // Validações básicas
+      if (!email || !senha) { 
+        mostrarToast('⚠️ Preencha email e senha', 'warning'); 
+        return; 
+      }
+      
+      // Validar formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        mostrarToast('⚠️ Email inválido', 'warning');
+        return;
+      }
+      
+      // Mostrar loading
+      mostrarLoader(true);
       
       const userCredential = await auth.signInWithEmailAndPassword(email, senha);
       const user = userCredential.user;
@@ -323,22 +356,79 @@ function getCollection(collectionName) {
           verificarPrimeiroAcesso();
         }
       }, 2000);
-    } catch (e) { handleError(e); }
+      
+      // Resetar tentativas em caso de sucesso
+      tentativasLogin = 0;
+      mostrarLoader(false);
+      
+    } catch (e) { 
+      mostrarLoader(false);
+      tentativasLogin++;
+      
+      // Mensagens de erro genéricas (segurança)
+      if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') {
+        mostrarToast('❌ Email ou senha incorretos', 'error');
+      } else if (e.code === 'auth/invalid-email') {
+        mostrarToast('❌ Email inválido', 'error');
+      } else if (e.code === 'auth/user-disabled') {
+        mostrarToast('❌ Conta desativada. Entre em contato com o suporte.', 'error');
+      } else if (e.code === 'auth/too-many-requests') {
+        bloqueioLogin = true;
+        tempoBloqueio = Date.now() + 60000; // 1 minuto
+        mostrarToast('🔒 Muitas tentativas. Tente novamente em 1 minuto.', 'error');
+      } else if (e.code === 'auth/network-request-failed') {
+        mostrarToast('❌ Erro de conexão. Verifique sua internet.', 'error');
+      } else {
+        console.error('Erro no login:', e);
+        mostrarToast('❌ Erro ao fazer login. Tente novamente.', 'error');
+      }
+      
+      // Bloquear após 5 tentativas
+      if (tentativasLogin >= 5) {
+        bloqueioLogin = true;
+        tempoBloqueio = Date.now() + 300000; // 5 minutos
+        mostrarToast('🔒 Muitas tentativas falhas. Conta bloqueada por 5 minutos.', 'error');
+      }
+    }
   }
 
   async function registrar() {
     try {
-      const email = document.getElementById('emailRegistro').value;
+      const email = document.getElementById('emailRegistro').value.trim();
       const senha = document.getElementById('senhaRegistro').value;
-      const nomeEmpresa = document.getElementById('nomeEmpresa').value;
+      const nomeEmpresa = document.getElementById('nomeEmpresa').value.trim();
       
+      // Validações
       if (!email || !senha || !nomeEmpresa) { 
-        mostrarToast('Preencha todos os campos obrigatórios', true); 
+        mostrarToast('⚠️ Preencha todos os campos obrigatórios', 'warning'); 
         return; 
       }
       
-      if (senha.length < 6) {
-        mostrarToast('A senha deve ter no mínimo 6 caracteres', true);
+      // Validar formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        mostrarToast('⚠️ Email inválido', 'warning');
+        return;
+      }
+      
+      // Validar força da senha
+      if (senha.length < 8) {
+        mostrarToast('⚠️ A senha deve ter no mínimo 8 caracteres', 'warning');
+        return;
+      }
+      
+      // Verificar força da senha
+      const temNumero = /\d/.test(senha);
+      const temLetra = /[a-zA-Z]/.test(senha);
+      const temEspecial = /[!@#$%^&*(),.?":{}|<>]/.test(senha);
+      
+      if (!temNumero || !temLetra) {
+        mostrarToast('⚠️ A senha deve conter letras e números', 'warning');
+        return;
+      }
+      
+      if (nomeEmpresa.length < 3) {
+        mostrarToast('⚠️ Nome da empresa muito curto', 'warning');
         return;
       }
       
@@ -357,24 +447,32 @@ function getCollection(collectionName) {
       });
       
       mostrarLoader(false);
-      mostrarToast('✅ Conta criada com sucesso! Faça login para continuar.', false);
-      voltarLogin();
+      mostrarToast('✅ Conta criada com sucesso! Faça login para continuar.', 'success');
       
       // Limpar campos
       document.getElementById('emailRegistro').value = '';
       document.getElementById('senhaRegistro').value = '';
       document.getElementById('nomeEmpresa').value = '';
       
+      // Voltar para login após 2 segundos
+      setTimeout(() => voltarLogin(), 2000);
+      
     } catch (e) { 
       mostrarLoader(false);
+      console.error('Erro no registro:', e);
+      
       if (e.code === 'auth/email-already-in-use') {
-        mostrarToast('Este e-mail já está cadastrado', true);
+        mostrarToast('❌ Este e-mail já está cadastrado', 'error');
       } else if (e.code === 'auth/invalid-email') {
-        mostrarToast('E-mail inválido', true);
+        mostrarToast('❌ E-mail inválido', 'error');
       } else if (e.code === 'auth/weak-password') {
-        mostrarToast('Senha muito fraca', true);
+        mostrarToast('❌ Senha muito fraca. Use no mínimo 8 caracteres.', 'error');
+      } else if (e.code === 'auth/operation-not-allowed') {
+        mostrarToast('❌ Registro desabilitado. Contate o administrador.', 'error');
+      } else if (e.code === 'auth/network-request-failed') {
+        mostrarToast('❌ Erro de conexão. Verifique sua internet.', 'error');
       } else {
-        handleError(e); 
+        mostrarToast('❌ Erro ao criar conta. Tente novamente.', 'error');
       }
     }
   }
@@ -389,8 +487,67 @@ function getCollection(collectionName) {
     document.getElementById('formRegistro').style.display = 'none';
   }
   
+  // Verificar força da senha em tempo real
+  function verificarForcaSenha() {
+    const senha = document.getElementById('senhaRegistro').value;
+    const indicador = document.getElementById('indicadorSenha');
+    const texto = document.getElementById('textoSenha');
+    const barras = [
+      document.getElementById('barra1'),
+      document.getElementById('barra2'),
+      document.getElementById('barra3'),
+      document.getElementById('barra4')
+    ];
+    
+    if (!senha) {
+      indicador.style.display = 'none';
+      return;
+    }
+    
+    indicador.style.display = 'block';
+    
+    let forca = 0;
+    let mensagem = '';
+    let cor = '';
+    
+    // Critérios de força
+    if (senha.length >= 8) forca++;
+    if (senha.length >= 12) forca++;
+    if (/[a-z]/.test(senha) && /[A-Z]/.test(senha)) forca++;
+    if (/\\d/.test(senha)) forca++;
+    if (/[!@#$%^&*(),.?\":{}|<>]/.test(senha)) forca++;
+    
+    // Resetar barras
+    barras.forEach(b => b.style.background = '#e0e0e0');
+    
+    if (forca <= 1) {
+      mensagem = '❌ Senha muito fraca';
+      cor = '#f44336';
+      barras[0].style.background = cor;
+    } else if (forca === 2) {
+      mensagem = '⚠️ Senha fraca';
+      cor = '#ff9800';
+      barras[0].style.background = cor;
+      barras[1].style.background = cor;
+    } else if (forca === 3) {
+      mensagem = '✓ Senha média';
+      cor = '#ffc107';
+      barras[0].style.background = cor;
+      barras[1].style.background = cor;
+      barras[2].style.background = cor;
+    } else if (forca >= 4) {
+      mensagem = '✅ Senha forte';
+      cor = '#4caf50';
+      barras.forEach(b => b.style.background = cor);
+    }
+    
+    texto.textContent = mensagem;
+    texto.style.color = cor;
+  }
+  
   window.mostrarFormRegistro = mostrarFormRegistro;
   window.voltarLogin = voltarLogin;
+  window.verificarForcaSenha = verificarForcaSenha;
 
   function logout() { 
     auth.signOut();
