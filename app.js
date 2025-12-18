@@ -296,44 +296,49 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       
       // Se não encontrou na Open Food Facts, tenta na API do Cosmos
       console.log('4️⃣ Produto não encontrado no Open Food Facts, tentando Cosmos...');
-      response = await fetch(`https://api.cosmos.bluesoft.com.br/gtins/${codigo}.json`);
-      console.log('Resposta Cosmos status:', response.status);
-      if (response.ok) {
-        data = await response.json();
-        console.log('Dados Cosmos:', data);
-        
-        const nomeProduto = data.description || '';
-        const marca = data.brand?.name || '';
-        
-        if (nomeProduto) {
-          document.getElementById('nomeProduto').value = nomeProduto;
-          console.log('✅ Nome preenchido (Cosmos):', nomeProduto);
-        }
-        
-        if (marca) {
-          const selectMarca = document.getElementById('marcaProduto');
-          const opcoes = Array.from(selectMarca.options).map(opt => opt.value);
+      try {
+        response = await fetch(`https://api.cosmos.bluesoft.com.br/gtins/${codigo}.json`);
+        console.log('Resposta Cosmos status:', response.status);
+        if (response.ok) {
+          data = await response.json();
+          console.log('Dados Cosmos:', data);
           
-          let marcaEncontrada = opcoes.find(m => m.toLowerCase() === marca.toLowerCase());
+          const nomeProduto = data.description || '';
+          const marca = data.brand?.name || '';
           
-          if (marcaEncontrada) {
-            selectMarca.value = marcaEncontrada;
-            console.log('✅ Marca preenchida (Cosmos):', marcaEncontrada);
-          } else {
-            console.log('⚠️ Marca não cadastrada (Cosmos):', marca);
-            if (confirm(`A marca "${marca}" não está cadastrada. Deseja adicionar?`)) {
-              await db.collection('marcas').add({ nome: marca });
-              await carregarMarcas();
-              selectMarca.value = marca;
-              console.log('✅ Marca adicionada e preenchida (Cosmos):', marca);
+          if (nomeProduto) {
+            document.getElementById('nomeProduto').value = nomeProduto;
+            console.log('✅ Nome preenchido (Cosmos):', nomeProduto);
+          }
+          
+          if (marca) {
+            const selectMarca = document.getElementById('marcaProduto');
+            const opcoes = Array.from(selectMarca.options).map(opt => opt.value);
+            
+            let marcaEncontrada = opcoes.find(m => m.toLowerCase() === marca.toLowerCase());
+            
+            if (marcaEncontrada) {
+              selectMarca.value = marcaEncontrada;
+              console.log('✅ Marca preenchida (Cosmos):', marcaEncontrada);
+            } else {
+              console.log('⚠️ Marca não cadastrada (Cosmos):', marca);
+              if (confirm(`A marca "${marca}" não está cadastrada. Deseja adicionar?`)) {
+                await db.collection('marcas').add({ nome: marca });
+                await carregarMarcas();
+                selectMarca.value = marca;
+                console.log('✅ Marca adicionada e preenchida (Cosmos):', marca);
+              }
             }
           }
+          
+          mostrarLoader(false);
+          mostrarToast('✅ Produto encontrado no Cosmos!');
+          console.log('✅ Busca concluída com sucesso (Cosmos)!');
+          return;
         }
-        
-        mostrarLoader(false);
-        mostrarToast('✅ Produto encontrado no Cosmos!');
-        console.log('✅ Busca concluída com sucesso (Cosmos)!');
-        return;
+      } catch (cosmosError) {
+        // Erro do Cosmos (CORS, etc) - ignora e continua
+        console.log('⚠️ Cosmos API não disponível (CORS ou outro erro):', cosmosError.message);
       }
       
       // Se não encontrou em nenhuma API
@@ -341,6 +346,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       mostrarLoader(false);
       
       // 🆕 NOVA FUNCIONALIDADE: Buscar no catálogo e associar código
+      console.log('🔍 Buscando no catálogo para associar...');
       const resultadoBusca = await buscarNoCatalogoParaAssociar(codigo);
       if (resultadoBusca) {
         return; // Produto foi associado com sucesso
@@ -351,6 +357,18 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     } catch (error) {
       mostrarLoader(false);
       console.error('❌ Erro ao buscar produto:', error);
+      
+      // Mesmo com erro, tenta buscar no catálogo
+      try {
+        console.log('🔍 Tentando buscar no catálogo após erro...');
+        const resultadoBusca = await buscarNoCatalogoParaAssociar(codigo);
+        if (resultadoBusca) {
+          return;
+        }
+      } catch (e) {
+        console.log('Erro ao buscar no catálogo:', e);
+      }
+      
       mostrarToast('ℹ️ Não foi possível buscar informações. Preencha manualmente.');
     }
   }
