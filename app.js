@@ -107,8 +107,32 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   }
 
   // ================ CONTROLE DE TELAS ================
+  // Toggle sidebar em mobile
+  window.toggleSidebar = function() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('active');
+  }
+
+  // Fechar sidebar ao clicar fora (mobile)
+  document.addEventListener('click', function(e) {
+    const sidebar = document.getElementById('sidebar');
+    const btnMenu = document.getElementById('btnMenuMobile');
+    
+    if (window.innerWidth <= 768 && sidebar && sidebar.classList.contains('active')) {
+      if (!sidebar.contains(e.target) && !btnMenu.contains(e.target)) {
+        sidebar.classList.remove('active');
+      }
+    }
+  });
+
   function abrir(id) {
     console.log('📂 Abrindo tela:', id);
+    
+    // Fechar sidebar em mobile após clicar no menu
+    if (window.innerWidth <= 768) {
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar) sidebar.classList.remove('active');
+    }
     
     // Esconde todas as telas (exceto login)
     document.querySelectorAll('.tela').forEach(t => {

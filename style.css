@@ -646,10 +646,46 @@ body {
 }
 
 /* ==================== RESPONSIVE ==================== */
+
+/* Botão Menu Mobile */
+.btn-menu-mobile {
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1001;
+  background: var(--primary);
+  color: white;
+  border: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  font-size: 18px;
+  transition: all 0.3s;
+}
+
+.btn-menu-mobile:hover {
+  background: #1557b0;
+  transform: scale(1.05);
+}
+
+.btn-menu-mobile:active {
+  transform: scale(0.95);
+}
+
 @media (max-width: 768px) {
+  .btn-menu-mobile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
   .sidebar {
     transform: translateX(-260px);
     transition: transform 0.3s;
+    z-index: 1000;
   }
   
   .sidebar.active {
@@ -666,6 +702,7 @@ body {
   
   .topbar {
     padding: 0 16px;
+    padding-left: 70px; /* Espaço para o botão mobile */
   }
   
   .stats-grid {
