@@ -250,28 +250,8 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
         console.log('Erro ao buscar no catálogo:', e);
       }
       
-      // TERCEIRO: Busca inteligente no catálogo (antes das APIs)
-      console.log('3️⃣ Tentando busca inteligente no catálogo Edin...');
-      try {
-        // Busca todos os produtos do catálogo sem código para análise
-        const catalogoSnap = await db.collection('catalogo-produtos')
-          .where('codigo', '==', '')
-          .limit(10)
-          .get();
-        
-        if (!catalogoSnap.empty) {
-          console.log(`📋 ${catalogoSnap.size} produtos no catálogo prontos para associar`);
-          // Abre modal de seleção direto
-          const produtos = catalogoSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          await mostrarModalEscolhaProduto(produtos, codigo);
-          return;
-        }
-      } catch (e) {
-        console.log('Erro na busca inteligente:', e);
-      }
-      
-      // QUARTO: Tenta múltiplas APIs de produtos
-      console.log('4️⃣ Tentando APIs de produtos...');
+      // TERCEIRO: Tenta múltiplas APIs de produtos
+      console.log('3️⃣ Tentando APIs de produtos...');
       
       // API 1: Open Food Facts
       try {
