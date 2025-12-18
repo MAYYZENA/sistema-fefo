@@ -1574,154 +1574,121 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   let graficoABC = null, graficoProdutos = null;
   async function carregarCurvaABC() {
     try {
-      const listaA = document.getElementById('listaCurvaA');
-      const listaB = document.getElementById('listaCurvaB');
-      const listaC = document.getElementById('listaCurvaC');
-      listaA.innerHTML = ''; listaB.innerHTML = ''; listaC.innerHTML = '';
+      mostrarLoader(true);
+      const tbody = document.getElementById('tabelaCurvaABCBody');
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center">Carregando...</td></tr>';
+      
       const snap = await db.collection('estoque').get();
-      let produtos = [], totalQtd = 0;
-      snap.forEach(doc => { const p = doc.data(); totalQtd += p.quantidade; produtos.push({ nome: p.nome, quantidade: p.quantidade, marca: p.marca }); });
-      if (totalQtd === 0) return;
-      produtos.sort((a,b) => b.quantidade - a.quantidade);
-      let acumulado = 0, contA = 0, contB = 0, contC = 0;
-      produtos.forEach(p => {
-        const nome = p.nome ? p.nome : '(sem nome)';
-        const marca = p.marca ? ` - ${p.marca}` : '';
-        acumulado += p.quantidade;
-        const percentual = (acumulado / totalQtd) * 100;
-        const item = `<div class="abc-item"><span class="abc-item-name">${nome}${marca}</span><span class="abc-item-qty">${p.quantidade} un</span></div>`;
-        if (percentual <= 80) { listaA.innerHTML += item; contA++; }
-        else if (percentual <= 95) { listaB.innerHTML += item; contB++; }
-        else { listaC.innerHTML += item; contC++; }
+      let produtos = [];
+      let valorTotal = 0;
+      
+      // Coletar produtos e calcular valor total
+      snap.forEach(doc => {
+        const p = doc.data();
+        const valorItem = (p.quantidade || 0) * (p.preco || 0);
+        produtos.push({
+          id: doc.id,
+          nome: p.nome || 'Sem nome',
+          marca: p.marca || '',
+          quantidade: p.quantidade || 0,
+          preco: p.preco || 0,
+          valorTotal: valorItem
+        });
+        valorTotal += valorItem;
       });
       
-      // Atualiza contadores
-      document.getElementById('countA').textContent = `${contA} ${contA === 1 ? 'item' : 'itens'}`;
-      document.getElementById('countB').textContent = `${contB} ${contB === 1 ? 'item' : 'itens'}`;
-      document.getElementById('countC').textContent = `${contC} ${contC === 1 ? 'item' : 'itens'}`;
-      
-      desenharGraficoABC(contA, contB, contC);
-      desenharGraficoProdutos(produtos.slice(0, 10));
-    } catch (e) { handleError(e); }
-  }
-
-  function desenharGraficoABC(a, b, c) {
-    if (graficoABC) graficoABC.destroy();
-    const ctx = document.getElementById('graficoABC');
-    graficoABC = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: ['Curva A (Alta)', 'Curva B (Média)', 'Curva C (Baixa)'],
-        datasets: [{
-          data: [a, b, c],
-          backgroundColor: [
-            'rgba(102, 126, 234, 0.8)',
-            'rgba(240, 147, 251, 0.8)',
-            'rgba(250, 112, 154, 0.8)'
-          ],
-          borderColor: ['#667eea', '#f093fb', '#fa709a'],
-          borderWidth: 3,
-          hoverOffset: 15
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: {
-              padding: 15,
-              font: { size: 13, weight: '600' },
-              usePointStyle: true,
-              pointStyle: 'circle'
-            }
-          },
-          tooltip: {
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            padding: 12,
-            titleFont: { size: 14, weight: '700' },
-            bodyFont: { size: 13 },
-            callbacks: {
-              label: function(context) {
-                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                const value = context.parsed;
-                const percentage = ((value / total) * 100).toFixed(1);
-                return `${context.label}: ${value} produtos (${percentage}%)`;
-              }
-            }
-          }
-        },
-        animation: {
-          animateRotate: true,
-          animateScale: true,
-          duration: 1000,
-          easing: 'easeOutQuart'
-        }
+      if (produtos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding: 40px;"><i class="fas fa-inbox" style="font-size: 48px; opacity: 0.3; display: block; margin-bottom: 16px;"></i>Nenhum produto no estoque</td></tr>';
+        mostrarLoader(false);
+        return;
       }
-    });
+      
+      // Ordenar por valor total (decrescente)
+      produtos.sort((a, b) => b.valorTotal - a.valorTotal);
+      
+      // Classificar em curvas A, B, C
+      let valorAcumulado = 0;
+      let countA = 0, countB = 0, countC = 0;
+      
+      produtos.forEach(p => {
+        valorAcumulado += p.valorTotal;
+        const percentualAcumulado = (valorAcumulado / valorTotal) * 100;
+        
+        if (percentualAcumulado <= 80) {
+          p.curva = 'A';
+          countA++;
+        } else if (percentualAcumulado <= 95) {
+          p.curva = 'B';
+          countB++;
+        } else {
+          p.curva = 'C';
+          countC++;
+        }
+        
+        p.percentualAcumulado = percentualAcumulado;
+      });
+      
+      // Atualizar contadores
+      document.getElementById('countA').textContent = countA;
+      document.getElementById('countB').textContent = countB;
+      document.getElementById('countC').textContent = countC;
+      
+      // Preencher tabela
+      tbody.innerHTML = '';
+      produtos.forEach(p => {
+        const curvaClass = p.curva === 'A' ? 'success' : p.curva === 'B' ? 'warning' : 'secondary';
+        const row = `
+          <tr>
+            <td><span class="badge badge-${curvaClass}">${p.curva}</span></td>
+            <td>${p.nome}${p.marca ? ' - ' + p.marca : ''}</td>
+            <td>${p.quantidade}</td>
+            <td>R$ ${p.preco.toFixed(2)}</td>
+            <td><strong>R$ ${p.valorTotal.toFixed(2)}</strong></td>
+            <td>${p.percentualAcumulado.toFixed(1)}%</td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
+      
+      // Desenhar gráfico
+      desenharGraficoABC(countA, countB, countC, produtos);
+      
+      mostrarLoader(false);
+    } catch (e) {
+      handleError(e);
+      mostrarLoader(false);
+    }
   }
 
-  function desenharGraficoProdutos(produtos) {
-    if (graficoProdutos) graficoProdutos.destroy();
-    const ctx = document.getElementById('graficoProdutos');
-    graficoProdutos = new Chart(ctx, {
+  function desenharGraficoABC(countA, countB, countC, produtos) {
+    if (graficoABC) graficoABC.destroy();
+    
+    const ctx = document.getElementById('graficoABC');
+    if (!ctx) return;
+    
+    graficoABC = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: produtos.map(p => p.nome || 'Sem nome'),
+        labels: ['Curva A', 'Curva B', 'Curva C'],
         datasets: [{
-          label: 'Quantidade em Estoque',
-          data: produtos.map(p => p.quantidade),
-          backgroundColor: produtos.map((_, i) => {
-            const colors = [
-              'rgba(102, 126, 234, 0.8)',
-              'rgba(118, 75, 162, 0.8)',
-              'rgba(240, 147, 251, 0.8)',
-              'rgba(245, 87, 108, 0.8)',
-              'rgba(250, 112, 154, 0.8)',
-              'rgba(254, 225, 64, 0.8)',
-              'rgba(48, 207, 208, 0.8)',
-              'rgba(51, 8, 103, 0.8)',
-              'rgba(79, 172, 254, 0.8)',
-              'rgba(0, 242, 254, 0.8)'
-            ];
-            return colors[i % colors.length];
-          }),
-          borderColor: produtos.map((_, i) => {
-            const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#fa709a', '#fee140', '#30cfd0', '#330867', '#4facfe', '#00f2fe'];
-            return colors[i % colors.length];
-          }),
-          borderWidth: 2,
-          borderRadius: 8,
-          borderSkipped: false
+          label: 'Quantidade de Produtos',
+          data: [countA, countB, countC],
+          backgroundColor: [
+            'rgba(16, 185, 129, 0.8)',
+            'rgba(245, 158, 11, 0.8)',
+            'rgba(107, 114, 128, 0.8)'
+          ],
+          borderColor: [
+            '#10b981',
+            '#f59e0b',
+            '#6b7280'
+          ],
+          borderWidth: 2
         }]
       },
       options: {
         responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              font: { size: 11, weight: '600' },
-              color: '#6c757d'
-            },
-            grid: {
-              color: 'rgba(0, 0, 0, 0.05)'
-            }
-          },
-          x: {
-            ticks: {
-              font: { size: 11, weight: '600' },
-              color: '#6c757d',
-              maxRotation: 45,
-              minRotation: 45
-            },
-            grid: {
-              display: false
-            }
-          }
-        },
+        maintainAspectRatio: true,
         plugins: {
           legend: {
             display: false
@@ -1733,14 +1700,20 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
             bodyFont: { size: 13 },
             callbacks: {
               label: function(context) {
-                return `Quantidade: ${context.parsed.y} unidades`;
+                const total = countA + countB + countC;
+                const percentage = ((context.parsed.y / total) * 100).toFixed(1);
+                return `${context.parsed.y} produtos (${percentage}%)`;
               }
             }
           }
         },
-        animation: {
-          duration: 1200,
-          easing: 'easeOutQuart'
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 1
+            }
+          }
         }
       }
     });

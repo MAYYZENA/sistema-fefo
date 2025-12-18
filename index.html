@@ -432,112 +432,83 @@
   <button class="btn btn-link mt-3" onclick="voltar()" aria-label="Voltar ao menu">⬅ Voltar</button>
 </section>
 
-<!-- CURVA ABC -->
-<section id="curvaABC" class="tela d-none" aria-labelledby="curva-title">
-  <h2 id="curva-title" class="visually-hidden">Curva ABC</h2>
-
-  <!-- Header da Curva ABC -->
-  <div class="row mb-4">
-    <div class="col-12">
-      <div class="glass-card" style="padding:1.5rem;text-align:center;">
-        <h2 style="font-size:1.8rem;font-weight:700;margin-bottom:0.5rem;">📊 Análise de Curva ABC</h2>
-        <p class="text-muted mb-0">Classificação de produtos por importância e quantidade</p>
-      </div>
+<!-- ==================== CURVA ABC ==================== -->
+<section id="curvaABC" class="tela d-none">
+  
+  <!-- Explicação da Curva ABC -->
+  <div class="card mb-3" style="background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%); border-color: #667eea;">
+    <div class="card-body">
+      <h3 class="card-title" style="color: #667eea; margin-bottom: 12px;">
+        <i class="fas fa-chart-line"></i> O que é Curva ABC?
+      </h3>
+      <p style="margin: 0; color: var(--text-secondary); line-height: 1.6;">
+        <strong>Curva A:</strong> 20% dos produtos que representam 80% do valor total (alta prioridade)<br>
+        <strong>Curva B:</strong> 30% dos produtos que representam 15% do valor (média prioridade)<br>
+        <strong>Curva C:</strong> 50% dos produtos que representam 5% do valor (baixa prioridade)
+      </p>
     </div>
   </div>
 
   <!-- Cards de Resumo -->
-  <div class="row g-3 mb-4">
-    <div class="col-md-4">
-      <div class="abc-summary-card glass-card curve-a">
-        <div class="abc-icon">🎯</div>
-        <div class="abc-content">
-          <div class="abc-title">Curva A</div>
-          <div class="abc-subtitle">80% do valor</div>
-          <div class="abc-count" id="countA">0 itens</div>
-        </div>
-      </div>
+  <div class="stats-grid mb-4">
+    <div class="stat-card" style="border-left-color: #10b981;">
+      <div class="stat-label">🎯 Curva A - Alta Prioridade</div>
+      <div class="stat-value" id="countA" style="color: #10b981;">0</div>
+      <small style="color: var(--text-secondary);">~80% do valor total</small>
     </div>
-    <div class="col-md-4">
-      <div class="abc-summary-card glass-card curve-b">
-        <div class="abc-icon">📈</div>
-        <div class="abc-content">
-          <div class="abc-title">Curva B</div>
-          <div class="abc-subtitle">15% do valor</div>
-          <div class="abc-count" id="countB">0 itens</div>
-        </div>
-      </div>
+    <div class="stat-card" style="border-left-color: #f59e0b;">
+      <div class="stat-label">📊 Curva B - Média Prioridade</div>
+      <div class="stat-value" id="countB" style="color: #f59e0b;">0</div>
+      <small style="color: var(--text-secondary);">~15% do valor total</small>
     </div>
-    <div class="col-md-4">
-      <div class="abc-summary-card glass-card curve-c">
-        <div class="abc-icon">📉</div>
-        <div class="abc-content">
-          <div class="abc-title">Curva C</div>
-          <div class="abc-subtitle">5% do valor</div>
-          <div class="abc-count" id="countC">0 itens</div>
-        </div>
+    <div class="stat-card" style="border-left-color: #6b7280;">
+      <div class="stat-label">📉 Curva C - Baixa Prioridade</div>
+      <div class="stat-value" id="countC" style="color: #6b7280;">0</div>
+      <small style="color: var(--text-secondary);">~5% do valor total</small>
+    </div>
+  </div>
+
+  <!-- Gráfico -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <h3 class="card-title">📈 Visualização Gráfica</h3>
+    </div>
+    <div class="card-body">
+      <canvas id="graficoABC" style="max-height: 400px;"></canvas>
+    </div>
+  </div>
+
+  <!-- Tabela Detalhada -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">📋 Produtos por Classificação</h3>
+    </div>
+    <div class="card-body">
+      <div class="table-container">
+        <table class="table" id="tabelaCurvaABC">
+          <thead>
+            <tr>
+              <th>Classificação</th>
+              <th>Produto</th>
+              <th>Quantidade</th>
+              <th>Valor Unitário</th>
+              <th>Valor Total</th>
+              <th>% Acumulado</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaCurvaABCBody">
+            <tr>
+              <td colspan="6" class="text-center" style="padding: 40px; color: var(--text-secondary);">
+                <i class="fas fa-inbox" style="font-size: 48px; opacity: 0.3; display: block; margin-bottom: 16px;"></i>
+                Nenhum produto no estoque
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 
-  <div class="row g-4">
-
-    <!-- GRÁFICO ABC -->
-    <div class="col-lg-6">
-      <div class="glass-card" style="padding:1.5rem;height:100%;">
-        <h5 class="mb-3" style="font-weight:700;color:#667eea;">🍰 Distribuição por Curva</h5>
-        <div style="position:relative;height:300px;">
-          <canvas id="graficoABC"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <!-- TOP PRODUTOS -->
-    <div class="col-lg-6">
-      <div class="glass-card" style="padding:1.5rem;height:100%;">
-        <h5 class="mb-3" style="font-weight:700;color:#667eea;">🏆 Top 10 Produtos</h5>
-        <div style="position:relative;height:300px;">
-          <canvas id="graficoProdutos"></canvas>
-        </div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- Listas Detalhadas -->
-  <div class="row g-4 mt-2">
-    <div class="col-md-4">
-      <div class="glass-card abc-list-card curve-a">
-        <div class="abc-list-header">
-          <h6>🎯 Curva A</h6>
-          <span class="badge">Alta Prioridade</span>
-        </div>
-        <div id="listaCurvaA" class="abc-list-content"></div>
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="glass-card abc-list-card curve-b">
-        <div class="abc-list-header">
-          <h6>📈 Curva B</h6>
-          <span class="badge">Média Prioridade</span>
-        </div>
-        <div id="listaCurvaB" class="abc-list-content"></div>
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="glass-card abc-list-card curve-c">
-        <div class="abc-list-header">
-          <h6>📉 Curva C</h6>
-          <span class="badge">Baixa Prioridade</span>
-        </div>
-        <div id="listaCurvaC" class="abc-list-content"></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="text-center mt-4">
-    <button class="btn btn-outline-secondary btn-lg" onclick="voltar()">Voltar ao Menu</button>
-  </div>
 </section>
 
 <!-- ==================== 🆕 LOCAIS DE ARMAZENAMENTO ==================== -->
