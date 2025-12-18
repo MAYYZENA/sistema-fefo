@@ -2524,12 +2524,6 @@ window.fazerBackup = fazerBackup;
 window.solicitarPermissaoNotificacao = solicitarPermissaoNotificacao;
 
 // ==================== DRAG AND DROP - WIDGETS ====================
-    console.error('Erro ao fazer backup:', error);
-    mostrarNotificacao('❌ Erro ao fazer backup', 'error');
-  }
-}
-
-// ==================== DRAG AND DROP - WIDGETS ====================
 let draggedElement = null;
 
 function initDragAndDrop() {
