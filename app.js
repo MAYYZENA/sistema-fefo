@@ -2019,58 +2019,70 @@ async function migrarCatalogoParaEstoque() {
     
     // Busca todos os produtos do catálogo
     const catalogoSnap = await db.collection('catalogo-produtos').get();
+    console.log(`📦 Encontrados ${catalogoSnap.size} produtos no catálogo`);
     
     if (catalogoSnap.empty) {
-      mostrarToast('⚠️ Catálogo vazio! Importe os produtos primeiro.');
+      alert('⚠️ Catálogo vazio! Importe os produtos Edin primeiro.');
       mostrarLoader(false);
       return;
     }
     
     let adicionados = 0;
     let jaExistiam = 0;
+    let erros = 0;
     
     for (const doc of catalogoSnap.docs) {
-      const produto = doc.data();
-      const codigo = produto.codigo || '';
-      
-      // Verifica se já existe no estoque com esse código
-      if (codigo) {
+      try {
+        const produto = doc.data();
+        console.log(`🔍 Processando: ${produto.nome}`);
+        
+        // Verifica se já existe no estoque pelo NOME e MARCA
         const estoqueSnap = await db.collection('estoque')
-          .where('codigo', '==', codigo)
+          .where('nome', '==', produto.nome)
+          .where('marca', '==', produto.marca)
           .limit(1)
           .get();
         
         if (!estoqueSnap.empty) {
           jaExistiam++;
-          console.log(`⏭️ Produto já existe: ${produto.nome}`);
+          console.log(`⏭️ Já existe: ${produto.nome}`);
           continue;
         }
+        
+        // Adiciona ao estoque com quantidade 0
+        await db.collection('estoque').add({
+          codigo: produto.codigo || '',
+          nome: produto.nome || '',
+          marca: produto.marca || '',
+          categoria: produto.categoria || '',
+          fornecedor: produto.fornecedor || '',
+          quantidade: 0,
+          lote: '',
+          validade: null,
+          dataEntrada: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        adicionados++;
+        console.log(`✅ ${adicionados}. ${produto.nome}`);
+        
+      } catch (erro) {
+        erros++;
+        console.error(`❌ Erro ao adicionar ${produto.nome}:`, erro);
       }
-      
-      // Adiciona ao estoque com quantidade 0
-      await db.collection('estoque').add({
-        codigo: codigo,
-        nome: produto.nome || '',
-        marca: produto.marca || '',
-        categoria: produto.categoria || '',
-        fornecedor: produto.fornecedor || '',
-        quantidade: 0,
-        lote: '',
-        validade: null,
-        dataEntrada: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      
-      adicionados++;
-      console.log(`✅ Adicionado: ${produto.nome}`);
     }
     
     mostrarLoader(false);
-    mostrarToast(`✅ Migração concluída!\n📦 ${adicionados} produtos adicionados\n⏭️ ${jaExistiam} já existiam`);
-    console.log(`📊 Total: ${adicionados} novos, ${jaExistiam} já existentes`);
     
-    // Atualiza a tela se estiver no dashboard
+    const msg = `✅ Migração concluída!\n\n📦 ${adicionados} produtos adicionados\n⏭️ ${jaExistiam} já existiam${erros > 0 ? `\n❌ ${erros} erros` : ''}`;
+    alert(msg);
+    console.log(`📊 RESULTADO: ${adicionados} novos | ${jaExistiam} existentes | ${erros} erros`);
+    
+    // Atualiza a tela
     if (typeof atualizarMetricas === 'function') {
       atualizarMetricas();
+    }
+    if (typeof listar === 'function') {
+      listar();
     }
     
   } catch (error) {
