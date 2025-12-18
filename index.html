@@ -141,6 +141,12 @@
         <span>Locais</span>
       </a>
     </li>
+    <li class="nav-item">
+      <a href="#" onclick="mostrarPerfil()" class="nav-link">
+        <i class="fas fa-building"></i>
+        <span>Perfil da Empresa</span>
+      </a>
+    </li>
     <li class="nav-item" id="menuUsuarios">
       <a href="#" onclick="abrir('usuarios')" class="nav-link">
         <i class="fas fa-users"></i>
@@ -163,6 +169,11 @@
     </button>
     <h1 class="topbar-title" id="pageTitle">Dashboard</h1>
     <div class="topbar-actions">
+      <div id="planoBadge" style="margin-right: 16px; padding: 6px 12px; background: #e0e0e0; border-radius: 6px; font-size: 13px; font-weight: 600;"></div>
+      <div class="user-badge">
+        <i class="fas fa-building"></i>
+        <span id="nomeEmpresa">Empresa</span>
+      </div>
       <div class="user-badge">
         <i class="fas fa-user-circle"></i>
         <span id="userName">Usuário</span>

@@ -267,7 +267,14 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       
       // Atualizar nome do usuário no header
       const userName = document.getElementById('userName');
-      if (userName) userName.textContent = empresaAtual.nomeEmpresa || email;
+      if (userName) userName.textContent = email;
+      
+      // Atualizar nome da empresa no header
+      const nomeEmpresaEl = document.getElementById('nomeEmpresa');
+      if (nomeEmpresaEl) nomeEmpresaEl.textContent = empresaAtual.nomeEmpresa || 'Minha Empresa';
+      
+      // Atualizar badge do plano no header
+      atualizarBadgePlano();
       
       abrir('menu');
       atualizarMetricas();
@@ -823,6 +830,14 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   // ================ ESTOQUE ================
   async function salvarProduto() {
     try {
+      // Verificar limite do plano antes de adicionar
+      if (!produtoEditando) {
+        const limiteAtingido = await verificarLimitePlano();
+        if (limiteAtingido) {
+          return; // Função já mostra mensagem de erro
+        }
+      }
+      
       const codigo = document.getElementById('codigoBarras').value.trim();
       const nome = document.getElementById('nomeProduto').value.trim();
       const marca = document.getElementById('marcaProduto').value;
@@ -3061,6 +3076,298 @@ auth.onAuthStateChanged(user => {
     carregarLocais();
   }
 });
+
+// ==================== VERIFICAR LIMITE DO PLANO ====================
+async function verificarLimitePlano() {
+  try {
+    const snapshot = await getCollection('estoque').get();
+    const totalProdutos = snapshot.size;
+    
+    const plano = empresaAtual?.plano || 'gratuito';
+    let limite = 50; // Gratuito = 50 produtos
+    
+    if (plano === 'basico') {
+      limite = 500;
+    } else if (plano === 'profissional') {
+      limite = 999999; // Ilimitado
+    }
+    
+    if (totalProdutos >= limite) {
+      mostrarToast(`❌ Limite de ${limite} produtos atingido! Faça upgrade do seu plano.`, 'error');
+      
+      // Mostrar modal de upgrade
+      setTimeout(() => {
+        if (confirm(`Você atingiu o limite de ${limite} produtos do plano ${plano.toUpperCase()}.\n\nDeseja fazer upgrade?`)) {
+          mostrarPerfil(); // Redireciona para tela de perfil/upgrade
+        }
+      }, 500);
+      
+      return true; // Limite atingido
+    }
+    
+    // Avisar quando chegar a 90% do limite
+    if (totalProdutos >= limite * 0.9) {
+      mostrarToast(`⚠️ Atenção: ${totalProdutos}/${limite} produtos. Considere fazer upgrade!`, 'warning');
+    }
+    
+    return false; // Não atingiu o limite
+  } catch (error) {
+    console.error('Erro ao verificar limite:', error);
+    return false;
+  }
+}
+
+// ==================== PERFIL DA EMPRESA ====================
+function mostrarPerfil() {
+  document.getElementById('secaoEstoque').classList.add('hidden');
+  document.getElementById('secaoHistorico').classList.add('hidden');
+  document.getElementById('secaoCurvaABC').classList.add('hidden');
+  document.getElementById('secaoRelatorios').classList.add('hidden');
+  document.getElementById('secaoConfiguracoes').classList.add('hidden');
+  
+  let secaoPerfil = document.getElementById('secaoPerfil');
+  if (!secaoPerfil) {
+    secaoPerfil = document.createElement('div');
+    secaoPerfil.id = 'secaoPerfil';
+    secaoPerfil.className = 'secao';
+    document.getElementById('conteudo').appendChild(secaoPerfil);
+  }
+  
+  secaoPerfil.classList.remove('hidden');
+  renderizarPerfil();
+}
+
+async function renderizarPerfil() {
+  const secaoPerfil = document.getElementById('secaoPerfil');
+  
+  // Obter estatísticas de uso
+  let totalProdutos = 0;
+  try {
+    const snapshot = await getCollection('estoque').get();
+    totalProdutos = snapshot.size;
+  } catch (error) {
+    console.error('Erro ao carregar estatísticas:', error);
+  }
+  
+  const plano = empresaAtual?.plano || 'gratuito';
+  const nomeEmpresa = empresaAtual?.nomeEmpresa || 'Minha Empresa';
+  const email = usuarioAtual?.email || '';
+  
+  let limite = 50;
+  let nomePlano = '🆓 Gratuito';
+  let corPlano = '#9e9e9e';
+  
+  if (plano === 'basico') {
+    limite = 500;
+    nomePlano = '💼 Básico';
+    corPlano = '#2196F3';
+  } else if (plano === 'profissional') {
+    limite = 999999;
+    nomePlano = '🏢 Profissional';
+    corPlano = '#4CAF50';
+  }
+  
+  const porcentagemUso = plano === 'profissional' ? 0 : Math.round((totalProdutos / limite) * 100);
+  
+  secaoPerfil.innerHTML = `
+    <div class="header-secao">
+      <h2>🏢 Perfil da Empresa</h2>
+    </div>
+    
+    <div class="card" style="max-width: 800px; margin: 0 auto;">
+      <!-- Informações da Empresa -->
+      <div style="padding: 24px; border-bottom: 1px solid #e0e0e0;">
+        <h3 style="margin-bottom: 16px;">📋 Informações</h3>
+        
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-weight: 500; margin-bottom: 8px;">Nome da Empresa</label>
+          <input type="text" id="inputNomeEmpresa" value="${nomeEmpresa}" 
+                 style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;">
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-weight: 500; margin-bottom: 8px;">Email</label>
+          <input type="text" value="${email}" disabled
+                 style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #f5f5f5;">
+        </div>
+        
+        <button onclick="salvarPerfilEmpresa()" class="btn-primary" style="margin-top: 16px;">
+          💾 Salvar Alterações
+        </button>
+      </div>
+      
+      <!-- Plano Atual -->
+      <div style="padding: 24px; border-bottom: 1px solid #e0e0e0;">
+        <h3 style="margin-bottom: 16px;">💳 Plano Atual</h3>
+        
+        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+          <div style="flex: 1; padding: 16px; background: linear-gradient(135deg, ${corPlano}15 0%, ${corPlano}05 100%); 
+                      border-left: 4px solid ${corPlano}; border-radius: 8px;">
+            <div style="font-size: 24px; font-weight: 600; color: ${corPlano};">${nomePlano}</div>
+            <div style="color: #666; margin-top: 4px;">
+              ${plano === 'profissional' ? 'Produtos ilimitados' : `Até ${limite} produtos`}
+            </div>
+          </div>
+        </div>
+        
+        ${plano !== 'profissional' ? `
+          <div style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-weight: 500;">Uso do Plano</span>
+              <span style="font-weight: 600; color: ${porcentagemUso >= 90 ? '#f44336' : porcentagemUso >= 70 ? '#ff9800' : '#4CAF50'};">
+                ${totalProdutos} / ${limite} produtos (${porcentagemUso}%)
+              </span>
+            </div>
+            <div style="height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
+              <div style="height: 100%; width: ${porcentagemUso}%; background: ${porcentagemUso >= 90 ? '#f44336' : porcentagemUso >= 70 ? '#ff9800' : '#4CAF50'}; 
+                          transition: width 0.3s;"></div>
+            </div>
+          </div>
+        ` : ''}
+        
+        ${plano === 'gratuito' ? `
+          <div style="padding: 16px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; margin-bottom: 16px;">
+            <div style="font-weight: 600; margin-bottom: 8px;">⭐ Faça upgrade e tenha:</div>
+            <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+              <li><strong>Plano Básico (R$ 29,90/mês):</strong> Até 500 produtos</li>
+              <li><strong>Plano Profissional (R$ 79,90/mês):</strong> Produtos ilimitados + Suporte prioritário</li>
+            </ul>
+          </div>
+          
+          <button onclick="alert('Em breve! Sistema de pagamento será implementado.')" 
+                  class="btn-primary" style="width: 100%;">
+            🚀 Fazer Upgrade
+          </button>
+        ` : plano === 'basico' ? `
+          <button onclick="alert('Em breve! Sistema de pagamento será implementado.')" 
+                  class="btn-primary" style="width: 100%;">
+            🚀 Upgrade para Profissional
+          </button>
+        ` : `
+          <div style="text-align: center; padding: 16px; color: #4CAF50; font-weight: 500;">
+            ✅ Você está no melhor plano disponível!
+          </div>
+        `}
+      </div>
+      
+      <!-- Zona de Perigo -->
+      <div style="padding: 24px;">
+        <h3 style="margin-bottom: 16px; color: #f44336;">⚠️ Zona de Perigo</h3>
+        
+        <button onclick="confirmarExclusaoConta()" class="btn-danger" style="width: 100%;">
+          🗑️ Excluir Conta e Todos os Dados
+        </button>
+        
+        <p style="margin-top: 12px; color: #666; font-size: 12px; text-align: center;">
+          Esta ação é irreversível. Todos os seus dados serão permanentemente excluídos.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+async function salvarPerfilEmpresa() {
+  try {
+    const novoNome = document.getElementById('inputNomeEmpresa').value.trim();
+    
+    if (!novoNome) {
+      mostrarToast('❌ Nome da empresa não pode ficar vazio!', 'error');
+      return;
+    }
+    
+    // Atualizar no Firebase
+    await db.collection('usuarios').doc(auth.currentUser.uid).update({
+      nomeEmpresa: novoNome
+    });
+    
+    // Atualizar variável global
+    empresaAtual.nomeEmpresa = novoNome;
+    
+    // Atualizar header
+    document.getElementById('nomeEmpresa').textContent = novoNome;
+    
+    mostrarToast('✅ Perfil atualizado com sucesso!', 'success');
+  } catch (error) {
+    console.error('Erro ao salvar perfil:', error);
+    mostrarToast('❌ Erro ao salvar perfil', 'error');
+  }
+}
+
+function atualizarBadgePlano() {
+  const badge = document.getElementById('planoBadge');
+  if (!badge) return;
+  
+  const plano = empresaAtual?.plano || 'gratuito';
+  
+  if (plano === 'gratuito') {
+    badge.textContent = '🆓 Gratuito';
+    badge.style.background = '#e0e0e0';
+    badge.style.color = '#424242';
+  } else if (plano === 'basico') {
+    badge.textContent = '💼 Básico';
+    badge.style.background = '#E3F2FD';
+    badge.style.color = '#1976D2';
+  } else if (plano === 'profissional') {
+    badge.textContent = '🏢 Profissional';
+    badge.style.background = '#E8F5E9';
+    badge.style.color = '#388E3C';
+  }
+}
+
+function confirmarExclusaoConta() {
+  const confirmacao = prompt('⚠️ ATENÇÃO! Esta ação é IRREVERSÍVEL.\n\nTodos os seus dados (produtos, histórico, configurações) serão PERMANENTEMENTE excluídos.\n\nDigite "EXCLUIR TUDO" para confirmar:');
+  
+  if (confirmacao === 'EXCLUIR TUDO') {
+    excluirConta();
+  } else if (confirmacao !== null) {
+    mostrarToast('❌ Confirmação incorreta. Conta não foi excluída.', 'error');
+  }
+}
+
+async function excluirConta() {
+  try {
+    mostrarToast('🗑️ Excluindo conta...', 'info');
+    
+    const uid = auth.currentUser.uid;
+    
+    // Excluir todas as coleções do usuário
+    const colecoes = ['estoque', 'historico', 'locais', 'marcas'];
+    
+    for (const colecao of colecoes) {
+      const snapshot = await db.collection('usuarios').doc(uid).collection(colecao).get();
+      const batch = db.batch();
+      snapshot.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+    }
+    
+    // Excluir perfil do usuário
+    await db.collection('usuarios').doc(uid).delete();
+    
+    // Excluir conta do Firebase Auth
+    await auth.currentUser.delete();
+    
+    mostrarToast('✅ Conta excluída com sucesso!', 'success');
+    
+    // Redirecionar para login
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+    
+  } catch (error) {
+    console.error('Erro ao excluir conta:', error);
+    
+    if (error.code === 'auth/requires-recent-login') {
+      mostrarToast('❌ Por segurança, faça login novamente antes de excluir a conta.', 'error');
+      fazerLogout();
+    } else {
+      mostrarToast('❌ Erro ao excluir conta: ' + error.message, 'error');
+    }
+  }
+}
+
+window.mostrarPerfil = mostrarPerfil;
+window.salvarPerfilEmpresa = salvarPerfilEmpresa;
+window.confirmarExclusaoConta = confirmarExclusaoConta;
 
 // Expor funções globalmente
 window.adicionarLocal = adicionarLocal;
