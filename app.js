@@ -249,8 +249,6 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       } catch (e) {
         console.log('Erro ao buscar no catálogo:', e);
       }
-      
-      // TERCEIRO: Tenta na API Open Food Facts (Brasil)
       console.log('3️⃣ Tentando Open Food Facts...');
       let response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${codigo}.json`);
       let data = await response.json();
@@ -341,13 +339,160 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       // Se não encontrou em nenhuma API
       console.log('❌ Produto não encontrado em nenhuma base de dados');
       mostrarLoader(false);
-      mostrarToast('ℹ️ Produto não encontrado nas bases de dados. Preencha manualmente.');
+      
+      // 🆕 NOVA FUNCIONALIDADE: Buscar no catálogo e associar código
+      const resultadoBusca = await buscarNoCatalogoParaAssociar(codigo);
+      if (resultadoBusca) {
+        return; // Produto foi associado com sucesso
+      }
+      
+      mostrarToast('ℹ️ Produto não encontrado. Preencha manualmente e o código será salvo.');
       
     } catch (error) {
       mostrarLoader(false);
       console.error('❌ Erro ao buscar produto:', error);
       mostrarToast('ℹ️ Não foi possível buscar informações. Preencha manualmente.');
     }
+  }
+  
+  // 🆕 Buscar produtos no catálogo para associar código de barras
+  async function buscarNoCatalogoParaAssociar(codigo) {
+    try {
+      // Busca todos os produtos do catálogo SEM código de barras
+      const catalogoSnap = await db.collection('catalogo-produtos')
+        .where('codigo', '==', '')
+        .limit(100)
+        .get();
+      
+      if (catalogoSnap.empty) {
+        console.log('Nenhum produto no catálogo para associar');
+        return false;
+      }
+      
+      // Cria lista de produtos
+      const produtos = [];
+      catalogoSnap.forEach(doc => {
+        produtos.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+      
+      // Mostra modal para usuário escolher
+      const produtoEscolhido = await mostrarModalEscolhaProduto(produtos, codigo);
+      
+      if (produtoEscolhido) {
+        // Atualiza o produto no catálogo com o código de barras
+        await db.collection('catalogo-produtos').doc(produtoEscolhido.id).update({
+          codigo: codigo
+        });
+        
+        // Preenche os campos
+        document.getElementById('nomeProduto').value = produtoEscolhido.nome || '';
+        if (produtoEscolhido.marca) {
+          document.getElementById('marcaProduto').value = produtoEscolhido.marca;
+        }
+        if (produtoEscolhido.categoria) {
+          document.getElementById('categoriaProduto').value = produtoEscolhido.categoria;
+        }
+        if (produtoEscolhido.fornecedor) {
+          document.getElementById('fornecedorProduto').value = produtoEscolhido.fornecedor;
+        }
+        
+        mostrarToast(`✅ Código ${codigo} associado a "${produtoEscolhido.nome}"!`);
+        console.log('✅ Código associado com sucesso!');
+        return true;
+      }
+      
+      return false;
+      
+    } catch (error) {
+      console.error('Erro ao buscar no catálogo:', error);
+      return false;
+    }
+  }
+  
+  // 🆕 Modal para escolher produto do catálogo
+  async function mostrarModalEscolhaProduto(produtos, codigo) {
+    return new Promise((resolve) => {
+      // Cria modal dinâmico
+      const modal = document.createElement('div');
+      modal.className = 'modal fade';
+      modal.id = 'modalEscolhaProduto';
+      modal.setAttribute('tabindex', '-1');
+      modal.innerHTML = `
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+              <h5 class="modal-title">🔍 Código ${codigo} - Escolha o Produto</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <p class="text-muted">Encontramos ${produtos.length} produtos no catálogo Edin. Qual deles você escaneou?</p>
+              
+              <div class="mb-3">
+                <input type="text" id="filtroNomeProduto" class="form-control" placeholder="🔍 Filtrar por nome (ex: ferro, gummies, vitamina)">
+              </div>
+              
+              <div id="listaProdutosCatalogo" style="max-height: 400px; overflow-y: auto;">
+                ${produtos.map(p => `
+                  <div class="produto-item p-3 mb-2 border rounded" style="cursor: pointer; transition: all 0.2s;" 
+                       data-produto='${JSON.stringify(p)}'
+                       onmouseover="this.style.backgroundColor='#f0f8ff'; this.style.borderColor='#007bff'"
+                       onmouseout="this.style.backgroundColor=''; this.style.borderColor='#dee2e6'">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <strong>${p.nome}</strong>
+                        <div class="text-muted small">
+                          <span class="badge bg-info">${p.marca}</span>
+                          <span class="badge bg-secondary">${p.categoria}</span>
+                        </div>
+                      </div>
+                      <button class="btn btn-sm btn-primary">Selecionar</button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">❌ Cancelar (Preencher Manualmente)</button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      
+      const bsModal = new bootstrap.Modal(modal);
+      bsModal.show();
+      
+      // Filtro de busca
+      const inputFiltro = modal.querySelector('#filtroNomeProduto');
+      inputFiltro.addEventListener('input', (e) => {
+        const termo = e.target.value.toLowerCase();
+        const items = modal.querySelectorAll('.produto-item');
+        items.forEach(item => {
+          const produto = JSON.parse(item.dataset.produto);
+          const texto = `${produto.nome} ${produto.marca}`.toLowerCase();
+          item.style.display = texto.includes(termo) ? 'block' : 'none';
+        });
+      });
+      
+      // Click nos produtos
+      modal.querySelectorAll('.produto-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const produto = JSON.parse(item.dataset.produto);
+          bsModal.hide();
+          resolve(produto);
+        });
+      });
+      
+      // Fechar sem escolher
+      modal.addEventListener('hidden.bs.modal', () => {
+        modal.remove();
+        resolve(null);
+      });
+    });
   }
   
   // Expor função globalmente para uso no HTML
