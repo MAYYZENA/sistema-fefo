@@ -145,10 +145,11 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     }
     
     // Atualizar menu ativo
-  document.querySelectorAll('.nav-link').forEach(link => {
-    link.classList.remove('active');
-  });
-  const activeLink = document.querySelector(`.nav-link[onclick*="'${id}'"]`);
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.classList.remove('active');
+    });
+    const activeLink = document.querySelector(`.nav-link[onclick*="'${id}'"]`);
+    if (activeLink) {
       activeLink.classList.add('active');
     }
 
