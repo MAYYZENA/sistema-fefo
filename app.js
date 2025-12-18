@@ -1595,7 +1595,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   window.editarProduto = editarProduto;
 
   // ================ CURVA ABC ================
-  let graficoABC = null, graficoProdutos = null;
+  let graficoABC = null;
   
   // Variável global para armazenar produtos da curva ABC
   let produtosCurvaABC = [];
