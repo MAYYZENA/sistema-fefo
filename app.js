@@ -249,7 +249,28 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       } catch (e) {
         console.log('Erro ao buscar no catálogo:', e);
       }
-      console.log('3️⃣ Tentando Open Food Facts...');
+      
+      // TERCEIRO: Busca inteligente no catálogo (antes das APIs)
+      console.log('3️⃣ Tentando busca inteligente no catálogo Edin...');
+      try {
+        // Busca todos os produtos do catálogo sem código para análise
+        const catalogoSnap = await db.collection('catalogo-produtos')
+          .where('codigo', '==', '')
+          .limit(10)
+          .get();
+        
+        if (!catalogoSnap.empty) {
+          console.log(`📋 ${catalogoSnap.size} produtos no catálogo prontos para associar`);
+          // Abre modal de seleção direto
+          const produtos = catalogoSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          await mostrarModalEscolhaProduto(produtos, codigo);
+          return;
+        }
+      } catch (e) {
+        console.log('Erro na busca inteligente:', e);
+      }
+      
+      console.log('4️⃣ Tentando Open Food Facts (API internacional)...');
       let response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${codigo}.json`);
       let data = await response.json();
       console.log('Resposta Open Food Facts:', data);
