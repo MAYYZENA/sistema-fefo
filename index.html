@@ -71,6 +71,28 @@
     </ul>
   </aside>
 
+  <!-- LOGIN (fora do main-content para aparecer antes do login) -->
+  <section id="login" class="tela">
+    <div class="login-card">
+      <h2>GESTÃO FEFO</h2>
+      <p class="text-center text-secondary mb-4">Sistema de Controle de Estoque</p>
+      <div class="form-group">
+        <label for="email" class="form-label">Email</label>
+        <input id="email" class="form-control" type="email" placeholder="seu@email.com" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="senha" class="form-label">Senha</label>
+        <input id="senha" type="password" class="form-control" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary w-100 mb-2" onclick="login()">
+        <i class="fas fa-sign-in-alt"></i> Entrar
+      </button>
+      <button class="btn btn-secondary w-100" onclick="registrar()">
+        <i class="fas fa-user-plus"></i> Criar Conta
+      </button>
+    </div>
+  </section>
+
   <!-- CONTEÚDO PRINCIPAL -->
   <div class="main-content d-none" id="mainContent">
     <div class="top-bar">
@@ -83,29 +105,6 @@
       </div>
     </div>
     <div class="content-area">
-
-
-<!-- LOGIN -->
-<section id="login" class="tela">
-  <div class="login-card">
-    <h2>GESTÃO FEFO</h2>
-    <p class="text-center text-secondary mb-4">Sistema de Controle de Estoque</p>
-    <div class="form-group">
-      <label for="email" class="form-label">Email</label>
-      <input id="email" class="form-control" type="email" placeholder="seu@email.com" autocomplete="username">
-    </div>
-    <div class="form-group">
-      <label for="senha" class="form-label">Senha</label>
-      <input id="senha" type="password" class="form-control" placeholder="••••••••" autocomplete="current-password">
-    </div>
-    <button class="btn btn-primary w-100 mb-2" onclick="login()">
-      <i class="fas fa-sign-in-alt"></i> Entrar
-    </button>
-    <button class="btn btn-secondary w-100" onclick="registrar()">
-      <i class="fas fa-user-plus"></i> Criar Conta
-    </button>
-  </div>
-</section>
 
 <!-- MENU/DASHBOARD -->
 <section id="menu" class="tela d-none">
