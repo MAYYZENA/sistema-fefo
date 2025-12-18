@@ -128,6 +128,30 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     el.classList.remove('d-none');
     el.style.display = 'block';
     console.log('✅ Tela aberta:', id);
+    
+    // Atualizar título da página e menu ativo
+    const titulos = {
+      'menu': 'Dashboard',
+      'estoque': 'Estoque',
+      'curvaABC': 'Curva ABC',
+      'historico': 'Histórico',
+      'locais': 'Locais de Armazenamento',
+      'usuarios': 'Usuários'
+    };
+    
+    const pageTitle = document.getElementById('pageTitle');
+    if (pageTitle && titulos[id]) {
+      pageTitle.textContent = titulos[id];
+    }
+    
+    // Atualizar menu ativo
+    document.querySelectorAll('.sidebar-menu a').forEach(link => {
+      link.classList.remove('active');
+    });
+    const activeLink = document.querySelector(`.sidebar-menu a[onclick*="'${id}'"]`);
+    if (activeLink) {
+      activeLink.classList.add('active');
+    }
 
     if (id === 'estoque') {
       carregarEstoque();
@@ -167,6 +191,23 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       const senha = document.getElementById('senha').value;
       if (!email || !senha) { mostrarToast('Preencha email e senha', true); return; }
       await auth.signInWithEmailAndPassword(email, senha);
+      
+      // Mostrar sidebar e main content
+      const sidebar = document.getElementById('sidebar');
+      const mainContent = document.getElementById('mainContent');
+      if (sidebar) sidebar.classList.remove('d-none');
+      if (mainContent) {
+        mainContent.classList.remove('d-none');
+        // Mover todas as telas para dentro do content-area
+        const contentArea = mainContent.querySelector('.content-area');
+        const telas = document.querySelectorAll('.tela');
+        telas.forEach(tela => {
+          if (tela.id !== 'login' && contentArea && !contentArea.contains(tela)) {
+            contentArea.appendChild(tela);
+          }
+        });
+      }
+      
       abrir('menu');
       mostrarToast('Login realizado com sucesso!', false);
       // Solicita permissão de notificações após 2 segundos
@@ -187,7 +228,15 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     } catch (e) { handleError(e); }
   }
 
-  function logout() { auth.signOut(); abrir('login'); }
+  function logout() { 
+    auth.signOut(); 
+    // Esconder sidebar e main content
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('mainContent');
+    if (sidebar) sidebar.classList.add('d-none');
+    if (mainContent) mainContent.classList.add('d-none');
+    abrir('login'); 
+  }
 
   // ================ MARCAS (FIRESTORE) ================
   async function carregarMarcas() {

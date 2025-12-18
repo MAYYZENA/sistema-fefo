@@ -55,105 +55,240 @@
     </div>
   </div>
 
-  <!-- SIDEBAR NAVEGAÇÃO -->
-  <aside class="sidebar d-none" id="sidebar">
-    <div class="sidebar-header">
-      <h3>GESTÃO FEFO</h3>
-      <small style="font-size:11px;opacity:0.7;">Sistema de Estoque</small>
-    </div>
-    <ul class="sidebar-menu">
-      <li><a href="#" onclick="abrir('menu')" class="active"><i class="fas fa-home"></i> Dashboard</a></li>
-      <li><a href="#" onclick="abrir('estoque')"><i class="fas fa-box"></i> Estoque</a></li>
-      <li><a href="#" onclick="abrir('curvaABC')"><i class="fas fa-chart-bar"></i> Curva ABC</a></li>
-      <li><a href="#" onclick="abrir('historico')"><i class="fas fa-history"></i> Histórico</a></li>
-      <li><a href="#" onclick="abrir('locais')"><i class="fas fa-map-marker-alt"></i> Locais</a></li>
-      <li><a href="#" onclick="abrir('usuarios')" id="menuUsuarios"><i class="fas fa-users"></i> Usuários</a></li>
-      <li style="margin-top:auto;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;">
-        <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Sair</a>
-      </li>
-    </ul>
-  </aside>
+  <nav class="navbar navbar-dark px-3" role="navigation" aria-label="Barra de navegação principal" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+    <span class="navbar-brand d-flex align-items-center gap-2" style="font-weight:700;letter-spacing:0.5px;">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2" y="7" width="20" height="13" rx="2" fill="#0d6efd"/><rect x="4" y="9" width="16" height="9" rx="1" fill="#fff"/><rect x="7" y="12" width="10" height="3" rx="1" fill="#0d6efd"/></svg>
+      GESTÃO FEFO
+    </span>
+  </nav>
 
-  <!-- CONTEÚDO PRINCIPAL -->
-  <div class="main-content d-none" id="mainContent">
-    <div class="top-bar">
-      <h2 id="pageTitle">Dashboard</h2>
-      <div class="top-bar-actions">
-        <div class="user-info">
-          <i class="fas fa-user"></i>
-          <span id="userName">Usuário</span>
-        </div>
-      </div>
-    </div>
-    <div class="content-area">
+  <main id="main" class="container my-4" role="main" tabindex="-1">
 
 
 <!-- LOGIN -->
-<section id="login" class="tela">
-  <div class="login-card">
-    <h2>GESTÃO FEFO</h2>
-    <p class="text-center text-secondary mb-4">Sistema de Controle de Estoque</p>
-    <div class="form-group">
-      <label for="email" class="form-label">Email</label>
-      <input id="email" class="form-control" type="email" placeholder="seu@email.com" autocomplete="username">
+<section id="login" class="tela" aria-labelledby="login-title">
+  <div class="row justify-content-center">
+    <div class="col-md-5">
+      <div class="card shadow-lg" style="border-radius:1rem;border:none;">
+        <div class="card-header text-center py-4" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);border-radius:1rem 1rem 0 0;border:none;">
+          <h4 class="text-white mb-0" style="font-weight:700;letter-spacing:1px;">🔐 GESTÃO FEFO</h4>
+          <p class="text-white-50 mb-0 mt-1" style="font-size:0.9rem;">Sistema de Controle de Estoque</p>
+        </div>
+        <div class="card-body p-4">
+          <h5 class="text-center mb-4" id="login-title" style="color:#667eea;font-weight:600;">Faça seu login</h5>
+          <label for="email" class="visually-hidden">Email</label>
+          <input id="email" class="form-control mb-3" placeholder="📧 Email" autocomplete="username" aria-required="true" tabindex="3" style="padding:0.75rem 1rem;border-radius:0.5rem;border:2px solid #e0e0e0;">
+          <label for="senha" class="visually-hidden">Senha</label>
+          <input id="senha" type="password" class="form-control mb-4" placeholder="🔒 Senha" autocomplete="current-password" aria-required="true" tabindex="4" style="padding:0.75rem 1rem;border-radius:0.5rem;border:2px solid #e0e0e0;">
+          <div class="d-grid gap-3">
+            <button class="btn btn-primary" onclick="login()" data-bs-toggle="tooltip" data-bs-placement="top" title="Entrar no sistema" aria-label="Entrar no sistema" tabindex="5" style="padding:0.75rem;font-weight:600;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);border:none;border-radius:0.5rem;">✨ Entrar</button>
+            <button class="btn btn-outline-secondary" onclick="registrar()" data-bs-toggle="tooltip" data-bs-placement="top" title="Criar novo usuário" aria-label="Criar novo usuário" tabindex="6" style="padding:0.75rem;font-weight:600;border-radius:0.5rem;border:2px solid #667eea;color:#667eea;">📝 Criar Conta</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="form-group">
-      <label for="senha" class="form-label">Senha</label>
-      <input id="senha" type="password" class="form-control" placeholder="••••••••" autocomplete="current-password">
-    </div>
-    <button class="btn btn-primary w-100 mb-2" onclick="login()">
-      <i class="fas fa-sign-in-alt"></i> Entrar
-    </button>
-    <button class="btn btn-secondary w-100" onclick="registrar()">
-      <i class="fas fa-user-plus"></i> Criar Conta
-    </button>
   </div>
 </section>
 
-<!-- MENU/DASHBOARD -->
-<section id="menu" class="tela d-none">
-  <div class="dashboard-stats">
-    <div class="stat-card" style="border-left-color: var(--primary);">
-      <p>Total de Produtos</p>
-      <h3 id="totalProdutos">0</h3>
+<!-- MENU -->
+<section id="menu" class="tela d-none" aria-labelledby="menu-title">
+  <h1 id="menu-title" class="visually-hidden">Menu principal</h1>
+  
+  <!-- Hero Section com Dashboard -->
+  <div class="dashboard-hero mb-4">
+    <div class="row g-4 mb-4">
+      <div class="col-12">
+        <div class="welcome-card glass-card">
+          <h2 class="mb-0">👋 Olá! Bem-vindo ao seu estoque</h2>
+          <p class="mb-0 mt-2 text-muted">Gerencie seus produtos com eficiência e controle total</p>
+        </div>
+      </div>
     </div>
-    <div class="stat-card" style="border-left-color: var(--warning);">
-      <p>Próximo Vencimento</p>
-      <h3 id="proxVencer">0</h3>
+
+    <!-- Métricas Dashboard -->
+    <div class="row g-4 mb-4">
+      <div class="col-md-4">
+        <div class="metric-card glass-card metric-primary">
+          <div class="metric-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M3 9h18M9 21V9"/>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <div class="metric-label">Total de Produtos</div>
+            <div class="metric-value" id="totalProdutos">0</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="metric-card glass-card metric-warning">
+          <div class="metric-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <div class="metric-label">Próximo do Vencimento</div>
+            <div class="metric-value" id="proxVencer">0</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="metric-card glass-card metric-danger">
+          <div class="metric-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="15" y1="9" x2="9" y2="15"/>
+              <line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <div class="metric-label">Vencidos</div>
+            <div class="metric-value" id="vencidos">0</div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="stat-card" style="border-left-color: var(--danger);">
-      <p>Vencidos</p>
-      <h3 id="vencidos">0</h3>
+
+    <!-- Filtros Rápidos -->
+    <div class="row g-3 mb-4">
+      <div class="col-12">
+        <div class="filter-container glass-card">
+          <span class="filter-label">🔍 Filtrar por:</span>
+          <div class="btn-group" role="group">
+            <button type="button" class="btn btn-filter active" onclick="filtrarDashboard('todos')">Todos</button>
+            <button type="button" class="btn btn-filter" onclick="filtrarDashboard('proxVencer')">⏰ Próx. Vencimento</button>
+            <button type="button" class="btn btn-filter" onclick="filtrarDashboard('vencidos')">❌ Vencidos</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-header">
-      <h5 class="card-title">Ações Rápidas</h5>
+  <!-- Ações Principais -->
+  <div class="row g-3 mb-4" id="actionCardsContainer">
+    <div class="col-md-6 col-lg-3" draggable="true" data-card="estoque">
+      <button class="action-card glass-card w-100" onclick="abrir('estoque')">
+        <div class="action-icon action-primary">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 3h18v4H3V3zm0 6h18v10a2 2 0 01-2 2H5a2 2 0 01-2-2V9zm4 3h10v2H7v-2z"/>
+          </svg>
+        </div>
+        <div class="action-content">
+          <div class="action-title">📦 Estoque</div>
+          <div class="action-desc">Gerenciar produtos</div>
+        </div>
+      </button>
     </div>
-    <div class="card-body">
-      <div class="row">
-        <div class="col-md-3 mb-2">
-          <button class="btn btn-success w-100" onclick="solicitarPermissaoNotificacao()">
-            <i class="fas fa-bell"></i> Ativar Alertas
-          </button>
+    <div class="col-md-6 col-lg-3" draggable="true" data-card="curvaABC">
+      <button class="action-card glass-card w-100" onclick="abrir('curvaABC')">
+        <div class="action-icon action-success">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 3h3v18H3V3zm6 5h3v13H9V8zm6 3h3v10h-3V11z"/>
+          </svg>
         </div>
-        <div class="col-md-3 mb-2">
-          <button class="btn btn-info w-100" onclick="fazerBackup()">
-            <i class="fas fa-download"></i> Backup
-          </button>
+        <div class="action-content">
+          <div class="action-title">📊 Curva ABC</div>
+          <div class="action-desc">Análise de produtos</div>
         </div>
-        <div class="col-md-3 mb-2">
-          <button class="btn btn-warning w-100" onclick="compartilharRelatorio('whatsapp')">
-            <i class="fab fa-whatsapp"></i> WhatsApp
-          </button>
+      </button>
+    </div>
+    <div class="col-md-6 col-lg-3" draggable="true" data-card="historico">
+      <button class="action-card glass-card w-100" onclick="abrir('historico')">
+        <div class="action-icon action-info">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
         </div>
-        <div class="col-md-3 mb-2">
-          <button class="btn btn-secondary w-100" onclick="limparDadosAntigos()">
-            <i class="fas fa-broom"></i> Limpar Dados
-          </button>
+        <div class="action-content">
+          <div class="action-title">📜 Histórico</div>
+          <div class="action-desc">Movimentações</div>
         </div>
-      </div>
+      </button>
+    </div>
+    <div class="col-md-6 col-lg-3" draggable="true" data-card="notificacoes">
+      <button class="action-card glass-card w-100" onclick="solicitarPermissaoNotificacao()">
+        <div class="action-icon action-warning">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+        </div>
+        <div class="action-content">
+          <div class="action-title">🔔 Notificações</div>
+          <div class="action-desc">Ativar alertas</div>
+        </div>
+      </button>
+    </div>
+    <div class="col-md-6 col-lg-3" draggable="true" data-card="locais">
+      <button class="action-card glass-card w-100" onclick="abrir('locais')">
+        <div class="action-icon action-secondary">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
+        <div class="action-content">
+          <div class="action-title">📍 Locais</div>
+          <div class="action-desc">Armazenamento</div>
+        </div>
+      </button>
+    </div>
+    <div class="col-md-6 col-lg-3" draggable="true" data-card="usuarios" id="cardUsuarios">
+      <button class="action-card glass-card w-100" onclick="abrir('usuarios')">
+        <div class="action-icon action-primary">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div class="action-content">
+          <div class="action-title">👥 Usuários</div>
+          <div class="action-desc">Gerenciar equipe</div>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Ações Secundárias -->
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <button class="secondary-btn glass-card w-100" onclick="abrirConfiguracoes()">
+        ⚙️ Configurações
+      </button>
+    </div>
+    <div class="col-md-3">
+      <button class="secondary-btn glass-card w-100" onclick="fazerBackup()">
+        💾 Backup
+      </button>
+    </div>
+    <div class="col-md-3">
+      <button class="secondary-btn glass-card w-100" onclick="toggleDarkMode()">
+        <span id="dark-icon-menu">🌙</span> Tema
+      </button>
+    </div>
+    <div class="col-md-3">
+      <button class="secondary-btn glass-card w-100 btn-logout" onclick="logout()">
+        🚪 Sair
+      </button>
+    </div>
+  </div>
+  
+  <div class="row g-3">
+    <div class="col-md-6">
+      <button class="secondary-btn glass-card w-100" onclick="compartilharRelatorio('whatsapp')">
+        📱 Compartilhar WhatsApp
+      </button>
+    </div>
+    <div class="col-md-6">
+      <button class="secondary-btn glass-card w-100" onclick="limparDadosAntigos()">
+        🧹 Limpar Dados
+      </button>
     </div>
   </div>
 </section>
