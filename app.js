@@ -1955,14 +1955,13 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
 
 })();
 
-// ================ DASHBOARD METRICS ================
-async function atualizarMetricas() {
+// ================ DASHBOARD METRICS (fora da IIFE) ================
+window.atualizarMetricas = async function() {
   try {
     const snap = await db.collection('estoque').get();
     let total = 0;
     let proxVencer = 0;
     let vencidos = 0;
-    let valorTotal = 0;
     const hoje = new Date();
     const em7Dias = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000);
     
@@ -1970,29 +1969,23 @@ async function atualizarMetricas() {
       const p = doc.data();
       total++;
       
-      if (p.validade && p.validade.toDate) {
-        const dataValidade = p.validade.toDate();
+      if (p.dataValidade && p.dataValidade.toDate) {
+        const dataValidade = p.dataValidade.toDate();
         if (dataValidade < hoje) {
           vencidos++;
         } else if (dataValidade <= em7Dias) {
           proxVencer++;
         }
       }
-      
-      if (p.valor && p.quantidade) {
-        valorTotal += (p.valor * p.quantidade);
-      }
     });
     
     const elTotal = document.getElementById('totalProdutos');
     const elProx = document.getElementById('proxVencer');
     const elVenc = document.getElementById('vencidos');
-    const elValor = document.getElementById('valorTotal');
     
     if (elTotal) elTotal.textContent = total;
     if (elProx) elProx.textContent = proxVencer;
     if (elVenc) elVenc.textContent = vencidos;
-    if (elValor) elValor.textContent = `R$ ${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   } catch (e) {
     console.error('Erro ao atualizar métricas:', e);
   }
@@ -2529,35 +2522,8 @@ async function fazerBackup() {
 
 window.fazerBackup = fazerBackup;
 window.solicitarPermissaoNotificacao = solicitarPermissaoNotificacao;
-    const qMarcas = query(collection(db, `usuarios/${currentUser.uid}/marcas`));
-    const snapshotMarcas = await getDocs(qMarcas);
-    snapshotMarcas.forEach(doc => {
-      backup.dados.marcas.push({ id: doc.id, ...doc.data() });
-    });
-    
-    // Gerar arquivo JSON
-    const json = JSON.stringify(backup, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    // Download
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `backup-fefo-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    mostrarNotificacao('✅ Backup realizado com sucesso!', 'success');
-    
-    // Salvar último backup no localStorage
-    try {
-      localStorage.setItem('fefo-ultimo-backup', new Date().toISOString());
-    } catch(e) {
-      console.error('Erro ao salvar data do último backup:', e);
-    }
-  } catch (error) {
+
+// ==================== DRAG AND DROP - WIDGETS ====================
     console.error('Erro ao fazer backup:', error);
     mostrarNotificacao('❌ Erro ao fazer backup', 'error');
   }
