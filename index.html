@@ -95,13 +95,24 @@
         <label for="senhaRegistro" class="form-label">Senha *</label>
         <input id="senhaRegistro" type="password" class="form-control" placeholder="Mínimo 8 caracteres" autocomplete="new-password" required oninput="verificarForcaSenha()">
         <div id="indicadorSenha" style="margin-top: 8px; display: none;">
-          <div style="display: flex; gap: 4px; margin-bottom: 4px;">
+          <div style="display: flex; gap: 4px; margin-bottom: 8px;">
             <div id="barra1" style="flex: 1; height: 4px; background: #e0e0e0; border-radius: 2px;"></div>
             <div id="barra2" style="flex: 1; height: 4px; background: #e0e0e0; border-radius: 2px;"></div>
             <div id="barra3" style="flex: 1; height: 4px; background: #e0e0e0; border-radius: 2px;"></div>
             <div id="barra4" style="flex: 1; height: 4px; background: #e0e0e0; border-radius: 2px;"></div>
           </div>
-          <p id="textoSenha" style="font-size: 12px; margin: 0; color: #666;"></p>
+          <p id="textoSenha" style="font-size: 12px; margin: 0 0 8px 0; color: #666; font-weight: 600;"></p>
+          <div style="font-size: 11px; color: #6b7280; line-height: 1.6;">
+            <div id="req-length" style="display: flex; align-items: center; gap: 6px;">
+              <span style="color: #dc2626;">✗</span> Mínimo 8 caracteres
+            </div>
+            <div id="req-letter" style="display: flex; align-items: center; gap: 6px;">
+              <span style="color: #dc2626;">✗</span> Pelo menos uma letra
+            </div>
+            <div id="req-number" style="display: flex; align-items: center; gap: 6px;">
+              <span style="color: #dc2626;">✗</span> Pelo menos um número
+            </div>
+          </div>
         </div>
       </div>
       <button type="button" class="btn btn-success btn-lg w-100" onclick="registrar()">

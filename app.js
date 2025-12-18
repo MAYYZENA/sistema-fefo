@@ -73,6 +73,27 @@ let tentativasLogin = 0;
 let bloqueioLogin = false;
 let tempoBloqueio = null;
 
+// Timeout de sessão (30 minutos de inatividade)
+let timeoutSessao = null;
+const TEMPO_INATIVIDADE = 30 * 60 * 1000; // 30 minutos
+
+function resetarTimeoutSessao() {
+  if (timeoutSessao) clearTimeout(timeoutSessao);
+  if (auth.currentUser) {
+    timeoutSessao = setTimeout(() => {
+      mostrarToast('⏱️ Sessão expirada por inatividade. Faça login novamente.', 'warning');
+      logout();
+    }, TEMPO_INATIVIDADE);
+  }
+}
+
+// Detectar atividade do usuário
+if (typeof window !== 'undefined') {
+  ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(evento => {
+    document.addEventListener(evento, resetarTimeoutSessao, true);
+  });
+}
+
 // Função auxiliar para obter caminho da coleção isolada por usuário
 function getCollection(collectionName) {
   if (!auth.currentUser) {
@@ -499,12 +520,62 @@ function getCollection(collectionName) {
       document.getElementById('barra4')
     ];
     
+    // Elementos de requisitos
+    const reqLength = document.getElementById('req-length');
+    const reqLetter = document.getElementById('req-letter');
+    const reqNumber = document.getElementById('req-number');
+    
     if (!senha) {
       indicador.style.display = 'none';
       return;
     }
     
     indicador.style.display = 'block';
+    
+    // Verificar requisitos individuais
+    const temComprimento = senha.length >= 8;
+    const temLetra = /[a-zA-Z]/.test(senha);
+    const temNumero = /\d/.test(senha);
+    
+    // Atualizar checkmarks
+    if (reqLength) {
+      const span = reqLength.querySelector('span');
+      if (temComprimento) {
+        span.textContent = '✓';
+        span.style.color = '#16a34a';
+        reqLength.style.color = '#16a34a';
+      } else {
+        span.textContent = '✗';
+        span.style.color = '#dc2626';
+        reqLength.style.color = '#6b7280';
+      }
+    }
+    
+    if (reqLetter) {
+      const span = reqLetter.querySelector('span');
+      if (temLetra) {
+        span.textContent = '✓';
+        span.style.color = '#16a34a';
+        reqLetter.style.color = '#16a34a';
+      } else {
+        span.textContent = '✗';
+        span.style.color = '#dc2626';
+        reqLetter.style.color = '#6b7280';
+      }
+    }
+    
+    if (reqNumber) {
+      const span = reqNumber.querySelector('span');
+      if (temNumero) {
+        span.textContent = '✓';
+        span.style.color = '#16a34a';
+        reqNumber.style.color = '#16a34a';
+      } else {
+        span.textContent = '✗';
+        span.style.color = '#dc2626';
+        reqNumber.style.color = '#6b7280';
+      }
+    }
     
     let forca = 0;
     let mensagem = '';
@@ -514,7 +585,7 @@ function getCollection(collectionName) {
     if (senha.length >= 8) forca++;
     if (senha.length >= 12) forca++;
     if (/[a-z]/.test(senha) && /[A-Z]/.test(senha)) forca++;
-    if (/\\d/.test(senha)) forca++;
+    if (/\d/.test(senha)) forca++;
     if (/[!@#$%^&*(),.?\":{}|<>]/.test(senha)) forca++;
     
     // Resetar barras
@@ -2242,6 +2313,49 @@ function getCollection(collectionName) {
       navigator.serviceWorker.register('service-worker.js').catch(err => console.debug('SW registration failed', err));
     });
   }
+
+  // ================ ATALHOS DE TECLADO ================
+  document.addEventListener('keydown', (e) => {
+    // Ignorar se estiver digitando em input/textarea
+    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    
+    // Ctrl/Cmd + K = Buscar produto
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      if (auth.currentUser && document.getElementById('estoque').classList.contains('tela-ativa')) {
+        const inputBusca = document.getElementById('inputBusca');
+        if (inputBusca) {
+          inputBusca.focus();
+          inputBusca.select();
+          mostrarToast('💡 Digite para buscar produtos', 'info');
+        }
+      }
+    }
+    
+    // Ctrl/Cmd + N = Novo produto
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      e.preventDefault();
+      if (auth.currentUser && document.getElementById('estoque').classList.contains('tela-ativa')) {
+        const btnNovo = document.querySelector('button[onclick="salvarProduto()"]');
+        if (btnNovo) {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          const primeiroCampo = document.getElementById('codigoProduto');
+          if (primeiroCampo) primeiroCampo.focus();
+          mostrarToast('💡 Novo produto - preencha os campos', 'info');
+        }
+      }
+    }
+    
+    // ESC = Fechar modals/limpar formulários
+    if (e.key === 'Escape') {
+      // Fechar scanner se estiver aberto
+      const scanner = document.getElementById('scanner');
+      if (scanner && !scanner.classList.contains('d-none')) {
+        scanner.classList.add('d-none');
+        mostrarToast('Scanner fechado', 'info');
+      }
+    }
+  });
 
   // Expose functions used by inline handlers
   window.abrir = abrir;
