@@ -1732,6 +1732,8 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   window.carregarEstoque = carregarEstoque;
   window.carregarCurvaABC = carregarCurvaABC;
   window.carregarHistorico = carregarHistorico;
+  window.mostrarToast = mostrarToast;
+  window.mostrarLoader = mostrarLoader;
 
 })();
 
