@@ -1574,51 +1574,108 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       tbody.innerHTML = '<tr><td colspan="4" class="text-center">Carregando...</td></tr>';
       
       const snap = await db.collection('estoque').get();
-      let produtos = [];
-      let quantidadeTotal = 0;
+      const snapHistorico = await db.collection('historico').get();
       
-      // Coletar produtos e calcular quantidade total
+      let produtos = [];
+      let movimentacoes = {};
+      
+      // Contar movimentações por produto (últimos 90 dias)
+      const hoje = new Date();
+      const dias90Atras = new Date(hoje);
+      dias90Atras.setDate(dias90Atras.getDate() - 90);
+      
+      snapHistorico.forEach(doc => {
+        const h = doc.data();
+        const dataMovimento = h.data ? h.data.toDate() : null;
+        
+        if (dataMovimento && dataMovimento >= dias90Atras) {
+          const chave = `${h.nome}|${h.marca || ''}`;
+          movimentacoes[chave] = (movimentacoes[chave] || 0) + 1;
+        }
+      });
+      
+      // Coletar produtos com data de validade e movimentação
       snap.forEach(doc => {
         const p = doc.data();
         const qtd = p.quantidade || 0;
+        const validade = p.dataValidade ? p.dataValidade.toDate() : null;
+        const chave = `${p.nome || 'Sem nome'}|${p.marca || ''}`;
+        const rotatividade = movimentacoes[chave] || 0;
+        
+        // Calcular dias até vencimento
+        let diasVencimento = 9999;
+        if (validade) {
+          const diff = validade.getTime() - hoje.getTime();
+          diasVencimento = Math.ceil(diff / (1000 * 60 * 60 * 24));
+        }
+        
         produtos.push({
           id: doc.id,
           nome: p.nome || 'Sem nome',
           marca: p.marca || '',
-          quantidade: qtd
+          quantidade: qtd,
+          validade: validade,
+          diasVencimento: diasVencimento,
+          rotatividade: rotatividade
         });
-        quantidadeTotal += qtd;
       });
       
       if (produtos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="padding: 40px;"><i class="fas fa-inbox" style="font-size: 48px; opacity: 0.3; display: block; margin-bottom: 16px;"></i>Nenhum produto no estoque</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="padding: 40px;"><i class="fas fa-inbox" style="font-size: 48px; opacity: 0.3; display: block; margin-bottom: 16px;"></i>Nenhum produto no estoque</td></tr>';
         mostrarLoader(false);
         return;
       }
       
-      // Ordenar por quantidade (decrescente)
-      produtos.sort((a, b) => b.quantidade - a.quantidade);
+      // Calcular score para cada produto (FEFO + Fluxo)
+      // Score = peso da urgência de validade + peso da rotatividade
+      produtos.forEach(p => {
+        // Score de urgência (0-100): produtos que vencem em breve = maior score
+        let scoreUrgencia = 0;
+        if (p.diasVencimento <= 30) {
+          scoreUrgencia = 100; // Vence em até 30 dias = urgente
+        } else if (p.diasVencimento <= 90) {
+          scoreUrgencia = 70; // Vence em até 90 dias = atenção
+        } else if (p.diasVencimento <= 180) {
+          scoreUrgencia = 40; // Vence em até 6 meses = médio
+        } else {
+          scoreUrgencia = 10; // Validade longa = baixa urgência
+        }
+        
+        // Score de rotatividade (0-100): produtos com mais movimentações = maior score
+        const maxRotatividade = Math.max(...produtos.map(pr => pr.rotatividade));
+        const scoreRotatividade = maxRotatividade > 0 
+          ? (p.rotatividade / maxRotatividade) * 100 
+          : 0;
+        
+        // Score final: 60% urgência + 40% rotatividade
+        p.scoreFinal = (scoreUrgencia * 0.6) + (scoreRotatividade * 0.4);
+      });
+      
+      // Ordenar por score final (maior score = maior prioridade)
+      produtos.sort((a, b) => b.scoreFinal - a.scoreFinal);
       
       // Classificar em curvas A, B, C
-      let quantidadeAcumulada = 0;
       let countA = 0, countB = 0, countC = 0;
+      const total = produtos.length;
       
-      produtos.forEach(p => {
-        quantidadeAcumulada += p.quantidade;
-        const percentualAcumulado = (quantidadeAcumulada / quantidadeTotal) * 100;
+      produtos.forEach((p, index) => {
+        const percentual = ((index + 1) / total) * 100;
         
-        if (percentualAcumulado <= 80) {
+        // Curva A: Top 20% (produtos mais críticos)
+        if (percentual <= 20) {
           p.curva = 'A';
           countA++;
-        } else if (percentualAcumulado <= 95) {
+        } 
+        // Curva B: Próximos 30% (produtos de atenção média)
+        else if (percentual <= 50) {
           p.curva = 'B';
           countB++;
-        } else {
+        } 
+        // Curva C: Restantes 50% (produtos menos críticos)
+        else {
           p.curva = 'C';
           countC++;
         }
-        
-        p.percentualAcumulado = percentualAcumulado;
       });
       
       // Atualizar contadores
@@ -1657,19 +1714,19 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     graficoABC = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: ['Curva A', 'Curva B', 'Curva C'],
+        labels: ['Curva A (Urgente)', 'Curva B (Atenção)', 'Curva C (OK)'],
         datasets: [{
           label: 'Quantidade de Produtos',
           data: [countA, countB, countC],
           backgroundColor: [
-            'rgba(16, 185, 129, 0.8)',
+            'rgba(220, 38, 38, 0.8)',
             'rgba(245, 158, 11, 0.8)',
-            'rgba(107, 114, 128, 0.8)'
+            'rgba(16, 185, 129, 0.8)'
           ],
           borderColor: [
-            '#10b981',
+            '#dc2626',
             '#f59e0b',
-            '#6b7280'
+            '#10b981'
           ],
           borderWidth: 2
         }]
@@ -1732,8 +1789,8 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
         tbody.innerHTML += criarLinhaTabela(p);
       });
       
-      const cores = { 'A': '#10b981', 'B': '#f59e0b', 'C': '#6b7280' };
-      const labels = { 'A': 'Alta Prioridade', 'B': 'Média Prioridade', 'C': 'Baixa Prioridade' };
+      const cores = { 'A': '#dc2626', 'B': '#f59e0b', 'C': '#10b981' };
+      const labels = { 'A': 'URGENTE', 'B': 'ATENÇÃO', 'C': 'OK' };
       badge.textContent = `Curva ${curva} - ${labels[curva]}`;
       badge.style.background = cores[curva];
     }
@@ -1757,7 +1814,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     
     tbody.innerHTML = '';
     if (filtrados.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="padding: 24px; color: var(--text-secondary);">Nenhum produto encontrado</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="padding: 24px; color: var(--text-secondary);">Nenhum produto encontrado</td></tr>';
     } else {
       filtrados.forEach(p => {
         tbody.innerHTML += criarLinhaTabela(p);
@@ -1782,12 +1839,37 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   // Criar linha da tabela com badges coloridos
   function criarLinhaTabela(p) {
     const cores = {
-      'A': { bg: '#d1fae5', color: '#065f46', badge: 'success' },
+      'A': { bg: '#fee2e2', color: '#991b1b', badge: 'danger' },
       'B': { bg: '#fef3c7', color: '#92400e', badge: 'warning' },
-      'C': { bg: '#f3f4f6', color: '#374151', badge: 'secondary' }
+      'C': { bg: '#d1fae5', color: '#065f46', badge: 'success' }
     };
     
     const estilo = cores[p.curva];
+    
+    // Formatar dias até vencimento
+    let diasTexto = '-';
+    let diasCor = estilo.color;
+    if (p.diasVencimento < 9999) {
+      if (p.diasVencimento < 0) {
+        diasTexto = `<strong style="color: #dc2626;">VENCIDO</strong>`;
+      } else if (p.diasVencimento === 0) {
+        diasTexto = `<strong style="color: #dc2626;">HOJE</strong>`;
+      } else if (p.diasVencimento <= 30) {
+        diasTexto = `<strong style="color: #dc2626;">${p.diasVencimento}d</strong>`;
+      } else if (p.diasVencimento <= 90) {
+        diasTexto = `<strong style="color: #f59e0b;">${p.diasVencimento}d</strong>`;
+      } else {
+        diasTexto = `${p.diasVencimento}d`;
+      }
+    }
+    
+    // Formatar rotatividade
+    let rotTexto = 'Baixa';
+    if (p.rotatividade >= 10) {
+      rotTexto = '<strong>Alta</strong>';
+    } else if (p.rotatividade >= 5) {
+      rotTexto = 'Média';
+    }
     
     return `
       <tr style="background: ${estilo.bg};">
@@ -1798,7 +1880,8 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
         </td>
         <td style="color: ${estilo.color}; font-weight: 500;">${p.nome}${p.marca ? ' - ' + p.marca : ''}</td>
         <td style="text-align: right; color: ${estilo.color}; font-weight: 600;">${p.quantidade}</td>
-        <td style="text-align: right; color: ${estilo.color};">${p.percentualAcumulado.toFixed(1)}%</td>
+        <td style="text-align: center; color: ${diasCor};">${diasTexto}</td>
+        <td style="text-align: center; color: ${estilo.color};">${rotTexto}</td>
       </tr>
     `;
   }
