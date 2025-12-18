@@ -6,9 +6,11 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="description" content="Sistema FEFO — gerenciamento de estoque profissional">
+<meta name="description" content="Sistema FEFO — gerenciamento de estoque profissional com controle de validade">
+<meta name="keywords" content="FEFO, estoque, validade, gestão, inventário">
 <meta name="theme-color" content="#1a73e8">
-<title>Sistema FEFO - Gestão de Estoque</title>
+<meta name="author" content="Sistema FEFO">
+<title>Sistema FEFO - Gestão de Estoque Profissional</title>
 
 <!-- FontAwesome -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css" crossorigin="anonymous">
@@ -34,13 +36,17 @@
 
 <body>
 
+<!-- Skip link para acessibilidade -->
+<a href="#main-content" class="skip-link">Pular para conteúdo principal</a>
+
 <!-- Loader Global -->
-<div id="global-loader">
-  <div class="spinner"></div>
+<div id="global-loader" role="status" aria-live="polite" aria-label="Carregando">
+  <div class="spinner" aria-hidden="true"></div>
+  <span class="sr-only">Carregando...</span>
 </div>
 
 <!-- Toast -->
-<div id="toast" class="toast d-none">
+<div id="toast" class="toast d-none" role="alert" aria-live="assertive" aria-atomic="true">
   <div id="toast-body"></div>
 </div>
 
@@ -439,28 +445,68 @@
     <div class="card-body">
 
           <div class="row g-2 mb-3">
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label for="buscaEstoque" class="visually-hidden">Buscar no estoque</label>
           <input id="buscaEstoque" class="form-control" aria-label="Buscar estoque"
-            placeholder="Buscar produto, marca ou código" onkeyup="filtrarEstoque()" tabindex="16">
+            placeholder="🔍 Buscar produto, marca, código ou lote..." onkeyup="filtrarEstoque()" tabindex="16">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label for="filtroMarca" class="visually-hidden">Filtrar por marca</label>
           <select id="filtroMarca" class="form-select" onchange="filtrarEstoque()" aria-label="Filtrar por marca" tabindex="17">
-            <option value="">Todas as marcas</option>
+            <option value="">🏷️ Todas as marcas</option>
           </select>
         </div>
+        <div class="col-md-3">
+          <label for="filtroStatus" class="visually-hidden">Filtrar por status</label>
+          <select id="filtroStatus" class="form-select" onchange="filtrarEstoque()" aria-label="Filtrar por status" tabindex="18">
+            <option value="">📊 Todos os status</option>
+            <option value="ok">✅ OK</option>
+            <option value="alerta">⚠️ Próximo ao Vencimento</option>
+            <option value="vencido">❌ Vencido</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-outline-primary w-100" onclick="importarArquivo()" title="Importar produtos de Excel/CSV">
+            📥 Importar
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra de Ações em Massa -->
+      <div id="bulkActionBar" class="alert alert-primary d-none mb-3" role="alert" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <strong><span id="selectionCount">0</span> selecionado(s)</strong>
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-danger" onclick="excluirSelecionados()" title="Excluir selecionados">
+              🗑️ Excluir
+            </button>
+            <button class="btn btn-outline-success" onclick="exportarSelecionados()" title="Exportar selecionados">
+              📥 Exportar
+            </button>
+            <button class="btn btn-outline-secondary" onclick="cancelarSelecao()" title="Cancelar seleção">
+              ✖️ Cancelar
+            </button>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-outline-primary" onclick="selecionarTodos()" title="Selecionar/Desselecionar todos">
+          ☑️ Todos
+        </button>
       </div>
 
       <div class="table-responsive">
         <table class="table table-hover table-sm">
           <thead class="table-dark">
             <tr>
+              <th style="width: 40px;">
+                <input type="checkbox" class="form-check-input" onchange="selecionarTodos()" title="Selecionar todos">
+              </th>
               <th>Código</th>
               <th>Produto</th>
               <th>Marca</th>
-              <th>Qtd</th>
-              <th>Validade</th>
+              <th style="width: 140px;">Qtd</th>
+              <th style="width: 80px;">Est.Min</th>
+              <th style="width: 180px;">Validade</th>
+              <th style="width: 100px;">Ações</th>
             </tr>
           </thead>
           <tbody id="tabelaEstoque"></tbody>

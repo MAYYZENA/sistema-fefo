@@ -77,6 +77,254 @@ let tempoBloqueio = null;
 let timeoutSessao = null;
 const TEMPO_INATIVIDADE = 30 * 60 * 1000; // 30 minutos
 
+// Seleção múltipla para bulk operations
+let produtosSelecionados = new Set();
+let modoSelecaoAtivo = false;
+
+// Histórico de ações para undo
+let historicoAcoes = [];
+const MAX_HISTORICO = 50;
+
+// Cache inteligente
+const cache = {
+  data: new Map(),
+  tempos: new Map(),
+  TTL: 5 * 60 * 1000, // 5 minutos
+  
+  set(key, value) {
+    this.data.set(key, value);
+    this.tempos.set(key, Date.now());
+  },
+  
+  get(key) {
+    const tempo = this.tempos.get(key);
+    if (!tempo || Date.now() - tempo > this.TTL) {
+      this.data.delete(key);
+      this.tempos.delete(key);
+      return null;
+    }
+    return this.data.get(key);
+  },
+  
+  clear() {
+    this.data.clear();
+    this.tempos.clear();
+  }
+};
+
+// ================ UTILITÁRIOS PROFISSIONAIS ================
+
+// Sanitização contra XSS
+function sanitizeInput(input) {
+  if (typeof input !== 'string') return input;
+  return input
+    .trim()
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+}
+
+// Debounce para otimizar buscas
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Throttle para scroll e resize
+function throttle(func, limit) {
+  let inThrottle;
+  return function(...args) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  };
+}
+
+// Retry automático para operações que falham
+async function retryOperation(operation, maxRetries = 3, delay = 1000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+    }
+  }
+}
+
+// Validação avançada de email
+function isValidEmail(email) {
+  const regex = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+  return regex.test(email) && email.length <= 254;
+}
+
+// Validação de senha forte
+function isStrongPassword(password) {
+  if (password.length < 8) return { valid: false, message: 'Mínimo 8 caracteres' };
+  if (!/[a-z]/.test(password)) return { valid: false, message: 'Precisa de letras minúsculas' };
+  if (!/[A-Z]/.test(password)) return { valid: false, message: 'Precisa de letras maiúsculas' };
+  if (!/\d/.test(password)) return { valid: false, message: 'Precisa de números' };
+  if (password.length > 128) return { valid: false, message: 'Máximo 128 caracteres' };
+  return { valid: true };
+}
+
+// Formatação de números com locale
+function formatNumber(num) {
+  return new Intl.NumberFormat('pt-BR').format(num);
+}
+
+// Formatação de moeda
+function formatCurrency(value) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+}
+
+// Compressão de dados para localStorage
+function compressData(data) {
+  return btoa(encodeURIComponent(JSON.stringify(data)));
+}
+
+function decompressData(compressed) {
+  try {
+    return JSON.parse(decodeURIComponent(atob(compressed)));
+  } catch {
+    return null;
+  }
+}
+
+// Validador de CNPJ profissional
+function isValidCNPJ(cnpj) {
+  if (!cnpj) return false;
+  
+  // Remove caracteres não numéricos
+  cnpj = cnpj.replace(/[^\d]/g, '');
+  
+  // Verifica tamanho
+  if (cnpj.length !== 14) return false;
+  
+  // Verifica CNPJs inválidos conhecidos
+  if (/^(\d)\1+$/.test(cnpj)) return false;
+  
+  // Valida dígitos verificadores
+  let tamanho = cnpj.length - 2;
+  let numeros = cnpj.substring(0, tamanho);
+  let digitos = cnpj.substring(tamanho);
+  let soma = 0;
+  let pos = tamanho - 7;
+  
+  for (let i = tamanho; i >= 1; i--) {
+    soma += numeros.charAt(tamanho - i) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  
+  let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+  if (resultado != digitos.charAt(0)) return false;
+  
+  tamanho = tamanho + 1;
+  numeros = cnpj.substring(0, tamanho);
+  soma = 0;
+  pos = tamanho - 7;
+  
+  for (let i = tamanho; i >= 1; i--) {
+    soma += numeros.charAt(tamanho - i) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  
+  resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+  return resultado == digitos.charAt(1);
+}
+
+// Validador de telefone brasileiro
+function isValidPhone(phone) {
+  if (!phone) return false;
+  
+  // Remove caracteres não numéricos
+  phone = phone.replace(/[^\d]/g, '');
+  
+  // Verifica se tem 10 ou 11 dígitos (com DDD)
+  if (phone.length < 10 || phone.length > 11) return false;
+  
+  // Verifica se o DDD é válido (11-99)
+  const ddd = parseInt(phone.substring(0, 2));
+  if (ddd < 11 || ddd > 99) return false;
+  
+  return true;
+}
+
+// Formatar CNPJ
+function formatCNPJ(cnpj) {
+  cnpj = cnpj.replace(/[^\d]/g, '');
+  return cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+}
+
+// Formatar telefone
+function formatPhone(phone) {
+  phone = phone.replace(/[^\d]/g, '');
+  if (phone.length === 11) {
+    return phone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+  } else if (phone.length === 10) {
+    return phone.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+  }
+  return phone;
+}
+
+// Detector de conexão offline
+let isOnline = navigator.onLine;
+let offlineQueue = [];
+
+window.addEventListener('online', async () => {
+  isOnline = true;
+  mostrarToast('✅ Conexão restaurada', 'success');
+  
+  // Processar fila offline
+  if (offlineQueue.length > 0) {
+    mostrarToast(`🔄 Sincronizando ${offlineQueue.length} operações...`, 'info');
+    for (const operation of offlineQueue) {
+      try {
+        await operation();
+      } catch (error) {
+        console.error('Erro ao sincronizar:', error);
+      }
+    }
+    offlineQueue = [];
+    mostrarToast('✅ Sincronização concluída', 'success');
+  }
+});
+
+window.addEventListener('offline', () => {
+  isOnline = false;
+  mostrarToast('⚠️ Sem conexão. Operações serão sincronizadas quando voltar online.', 'warning');
+});
+
+// Logger estruturado para debugging
+const logger = {
+  info(message, data = {}) {
+    console.log(`ℹ️ [INFO] ${new Date().toISOString()} - ${message}`, data);
+  },
+  warn(message, data = {}) {
+    console.warn(`⚠️ [WARN] ${new Date().toISOString()} - ${message}`, data);
+  },
+  error(message, error = {}) {
+    console.error(`❌ [ERROR] ${new Date().toISOString()} - ${message}`, error);
+    // Em produção, enviar para serviço de monitoramento
+  },
+  debug(message, data = {}) {
+    if (window.location.hostname === 'localhost') {
+      console.log(`🐛 [DEBUG] ${new Date().toISOString()} - ${message}`, data);
+    }
+  }
+};
+
 function resetarTimeoutSessao() {
   if (timeoutSessao) clearTimeout(timeoutSessao);
   if (auth.currentUser) {
@@ -268,26 +516,36 @@ function getCollection(collectionName) {
     }
     
     try {
-      const email = document.getElementById('email').value.trim();
+      const email = sanitizeInput(document.getElementById('email').value);
       const senha = document.getElementById('senha').value;
       
-      // Validações básicas
+      // Validações avançadas
       if (!email || !senha) { 
         mostrarToast('⚠️ Preencha email e senha', 'warning'); 
         return; 
       }
       
-      // Validar formato de email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        mostrarToast('⚠️ Email inválido', 'warning');
+      // Validar formato de email com função profissional
+      if (!isValidEmail(email)) {
+        mostrarToast('⚠️ Email inválido. Verifique o formato.', 'warning');
+        return;
+      }
+      
+      // Verificar tamanho da senha
+      if (senha.length < 6 || senha.length > 128) {
+        mostrarToast('⚠️ Senha inválida', 'warning');
         return;
       }
       
       // Mostrar loading
       mostrarLoader(true);
       
-      const userCredential = await auth.signInWithEmailAndPassword(email, senha);
+      // Tentar login com retry automático
+      const userCredential = await retryOperation(
+        () => auth.signInWithEmailAndPassword(email, senha),
+        2,
+        1000
+      );
       const user = userCredential.user;
       
       console.log('👤 UID do usuário:', user.uid);
@@ -379,17 +637,6 @@ function getCollection(collectionName) {
       
       // Verificar se precisa fazer backup (30 dias)
       verificarBackupPendente();
-          email: user.email,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-          userAgent: navigator.userAgent,
-          plataforma: navigator.platform
-        });
-      } catch (logError) {
-        console.error('Erro ao registrar log:', logError);
-      }
-      
-      // Verificar se precisa fazer backup (30 dias)
-      verificarBackupPendente();
       
       // Iniciar timeout de sessão
       resetarTimeoutSessao();
@@ -453,47 +700,42 @@ function getCollection(collectionName) {
 
   async function registrar() {
     try {
-      const email = document.getElementById('emailRegistro').value.trim();
+      const email = sanitizeInput(document.getElementById('emailRegistro').value);
       const senha = document.getElementById('senhaRegistro').value;
-      const nomeEmpresa = document.getElementById('nomeEmpresa').value.trim();
+      const nomeEmpresa = sanitizeInput(document.getElementById('nomeEmpresa').value);
       
-      // Validações
+      // Validações profissionais
       if (!email || !senha || !nomeEmpresa) { 
         mostrarToast('⚠️ Preencha todos os campos obrigatórios', 'warning'); 
         return; 
       }
       
-      // Validar formato de email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        mostrarToast('⚠️ Email inválido', 'warning');
+      // Validar formato de email com função profissional
+      if (!isValidEmail(email)) {
+        mostrarToast('⚠️ Email inválido. Verifique o formato.', 'warning');
         return;
       }
       
-      // Validar força da senha
-      if (senha.length < 8) {
-        mostrarToast('⚠️ A senha deve ter no mínimo 8 caracteres', 'warning');
+      // Validar senha forte
+      const senhaValidacao = isStrongPassword(senha);
+      if (!senhaValidacao.valid) {
+        mostrarToast(`⚠️ ${senhaValidacao.message}`, 'warning');
         return;
       }
       
-      // Verificar força da senha
-      const temNumero = /\d/.test(senha);
-      const temLetra = /[a-zA-Z]/.test(senha);
-      const temEspecial = /[!@#$%^&*(),.?":{}|<>]/.test(senha);
-      
-      if (!temNumero || !temLetra) {
-        mostrarToast('⚠️ A senha deve conter letras e números', 'warning');
-        return;
-      }
-      
-      if (nomeEmpresa.length < 3) {
-        mostrarToast('⚠️ Nome da empresa muito curto', 'warning');
+      if (nomeEmpresa.length < 3 || nomeEmpresa.length > 100) {
+        mostrarToast('⚠️ Nome da empresa deve ter entre 3 e 100 caracteres', 'warning');
         return;
       }
       
       mostrarLoader(true);
+      logger.info('Iniciando registro', { email });
       
-      const userCredential = await auth.createUserWithEmailAndPassword(email, senha);
+      const userCredential = await retryOperation(
+        () => auth.createUserWithEmailAndPassword(email, senha),
+        2,
+        1000
+      );
       const user = userCredential.user;
       
       // Enviar email de verificação
@@ -1230,30 +1472,63 @@ function getCollection(collectionName) {
         }
       }
       
-      const codigo = document.getElementById('codigoBarras').value.trim();
-      const nome = document.getElementById('nomeProduto').value.trim();
-      const marca = document.getElementById('marcaProduto').value;
-      const lote = document.getElementById('loteProduto').value.trim();
-      const fornecedor = document.getElementById('fornecedorProduto').value.trim();
-      const local = document.getElementById('localProduto')?.value || '';
+      // Capturar e sanitizar inputs
+      const codigo = sanitizeInput(document.getElementById('codigoBarras').value);
+      const nome = sanitizeInput(document.getElementById('nomeProduto').value);
+      const marca = sanitizeInput(document.getElementById('marcaProduto').value);
+      const lote = sanitizeInput(document.getElementById('loteProduto').value);
+      const fornecedor = sanitizeInput(document.getElementById('fornecedorProduto').value);
+      const local = sanitizeInput(document.getElementById('localProduto')?.value || '');
       const quantidade = Number(document.getElementById('quantidadeProduto').value);
       const estoqueMinimo = Number(document.getElementById('estoqueMinimo').value || 0);
       const validadeInput = document.getElementById('validadeProduto').value;
 
-      if (!nome) {
-        mostrarToast('Informe o nome do produto.', true);
+      // Validações completas
+      if (!nome || nome.length < 2) {
+        mostrarToast('⚠️ Nome do produto deve ter pelo menos 2 caracteres', 'warning');
         return;
       }
+      
+      if (nome.length > 100) {
+        mostrarToast('⚠️ Nome muito longo (máximo 100 caracteres)', 'warning');
+        return;
+      }
+      
       if (!marca) {
-        mostrarToast('Selecione a marca.', true);
+        mostrarToast('⚠️ Selecione a marca', 'warning');
         return;
       }
-      if (!quantidade || quantidade <= 0) {
-        mostrarToast('Informe uma quantidade válida.', true);
+      
+      if (!quantidade || quantidade <= 0 || quantidade > 1000000) {
+        mostrarToast('⚠️ Quantidade inválida (1-1.000.000)', 'warning');
         return;
       }
+      
+      if (estoqueMinimo < 0 || estoqueMinimo > quantidade) {
+        mostrarToast('⚠️ Estoque mínimo inválido', 'warning');
+        return;
+      }
+      
       if (!validadeInput) {
-        mostrarToast('Informe a validade.', true);
+        mostrarToast('⚠️ Informe a data de validade', 'warning');
+        return;
+      }
+      
+      // Validar data de validade
+      const dataValidade = new Date(validadeInput);
+      const hoje = new Date();
+      const umAnoAtras = new Date();
+      umAnoAtras.setFullYear(hoje.getFullYear() - 1);
+      const dezAnosFrente = new Date();
+      dezAnosFrente.setFullYear(hoje.getFullYear() + 10);
+      
+      if (dataValidade < umAnoAtras) {
+        mostrarToast('⚠️ Data de validade muito antiga', 'warning');
+        return;
+      }
+      
+      if (dataValidade > dezAnosFrente) {
+        mostrarToast('⚠️ Data de validade muito distante', 'warning');
         return;
       }
 
@@ -1326,6 +1601,7 @@ function getCollection(collectionName) {
   function renderTabela(lista) {
     const tabela = document.getElementById('tabelaEstoque');
     tabela.innerHTML = '';
+    
     lista.forEach(p => {
       const status = calcularStatus(p.validade);
       const statusBadge = status === 'vencido' ? '<span class="badge badge-vencido">Vencido</span>' :
@@ -1333,12 +1609,15 @@ function getCollection(collectionName) {
                           '<span class="badge badge-ok">OK</span>';
       const estoqueMin = p.estoqueMinimo || 0;
       const alertaEstoque = p.quantidade <= estoqueMin && estoqueMin > 0 ? ' 🔴' : '';
+      const selecionado = produtosSelecionados.has(p.id) ? 'checked' : '';
+      const rowClass = produtosSelecionados.has(p.id) ? 'row-selected' : '';
       
       tabela.innerHTML += `
-      <tr class="${status === 'vencido' ? 'table-danger' : status === 'alerta' ? 'table-warning' : ''}">
-        <td>${p.codigo || '-'}</td>
-        <td>${p.nome}</td>
-        <td>${p.marca}</td>
+      <tr class="${rowClass} ${status === 'vencido' ? 'table-danger' : status === 'alerta' ? 'table-warning' : ''}" data-id="${p.id}">
+        <td><input type="checkbox" class="form-check-input produto-checkbox" data-id="${p.id}" ${selecionado} onchange="toggleSelecaoProduto('${p.id}')"></td>
+        <td>${sanitizeInput(p.codigo || '-')}</td>
+        <td>${sanitizeInput(p.nome)}</td>
+        <td>${sanitizeInput(p.marca)}</td>
         <td>
           <div class="d-flex align-items-center gap-2">
             <button class="btn btn-sm btn-outline-danger" onclick="ajustarQuantidade('${p.id}', -1)" title="Diminuir">-</button>
@@ -1356,16 +1635,35 @@ function getCollection(collectionName) {
         </td>
       </tr>`;
     });
+    
+    atualizarBarraSelecao();
   }
 
-  function filtrarEstoque() {
-    const texto = (document.getElementById('buscaEstoque').value || '').toLowerCase().trim();
-    const marca = document.getElementById('filtroMarca').value;
+  // Filtrar estoque com debounce e cache - VERSÃO AVANÇADA
+  const filtrarEstoqueDebounced = debounce(async function() {
+    const texto = sanitizeInput(document.getElementById('buscaEstoque')?.value || '').toLowerCase();
+    const marca = document.getElementById('filtroMarca')?.value || '';
+    const status = document.getElementById('filtroStatus')?.value || '';
     
-    // Busca inteligente - aceita busca parcial em múltiplos campos
+    // Verificar cache
+    const cacheKey = `estoque_${texto}_${marca}_${status}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      renderTabela(cached);
+      return;
+    }
+    
+    // Busca inteligente com múltiplos filtros
     const filtrado = dadosEstoque.filter(p => {
       // Filtro de marca
       const matchMarca = !marca || p.marca === marca;
+      
+      // Filtro de status
+      let matchStatus = true;
+      if (status) {
+        const produtoStatus = calcularStatus(p.validade);
+        matchStatus = produtoStatus === status;
+      }
       
       // Busca inteligente - verifica em nome, marca, código e lote
       let matchBusca = true;
@@ -1374,18 +1672,368 @@ function getCollection(collectionName) {
         const marcaProd = (p.marca || '').toLowerCase();
         const codigo = (p.codigo || '').toLowerCase();
         const lote = (p.lote || '').toLowerCase();
+        const fornecedor = (p.fornecedor || '').toLowerCase();
         
         matchBusca = nome.includes(texto) || 
                     marcaProd.includes(texto) || 
                     codigo.includes(texto) ||
-                    lote.includes(texto);
+                    lote.includes(texto) ||
+                    fornecedor.includes(texto);
       }
       
-      return matchMarca && matchBusca;
+      return matchMarca && matchStatus && matchBusca;
     });
     
+    // Salvar no cache
+    cache.set(cacheKey, filtrado);
     renderTabela(filtrado);
+    
+    // Mostrar contador de resultados
+    const total = dadosEstoque.length;
+    if (filtrado.length < total) {
+      mostrarToast(`🔍 ${filtrado.length} de ${total} produtos`, 'info');
+    }
+  }, 300);
+  
+  function filtrarEstoque() {
+    filtrarEstoqueDebounced();
   }
+
+  // ================ BULK OPERATIONS ================
+  
+  function toggleSelecaoProduto(id) {
+    if (produtosSelecionados.has(id)) {
+      produtosSelecionados.delete(id);
+    } else {
+      produtosSelecionados.add(id);
+    }
+    atualizarBarraSelecao();
+    
+    // Atualizar visual da linha
+    const row = document.querySelector(`tr[data-id="${id}"]`);
+    if (row) {
+      row.classList.toggle('row-selected', produtosSelecionados.has(id));
+    }
+  }
+  
+  function selecionarTodos() {
+    const checkboxes = document.querySelectorAll('.produto-checkbox');
+    const todosSelecionados = produtosSelecionados.size === checkboxes.length;
+    
+    if (todosSelecionados) {
+      produtosSelecionados.clear();
+      checkboxes.forEach(cb => cb.checked = false);
+    } else {
+      checkboxes.forEach(cb => {
+        const id = cb.dataset.id;
+        produtosSelecionados.add(id);
+        cb.checked = true;
+      });
+    }
+    
+    renderTabela(dadosEstoque);
+  }
+  window.selecionarTodos = selecionarTodos;
+  
+  function atualizarBarraSelecao() {
+    const barra = document.getElementById('bulkActionBar');
+    const contador = document.getElementById('selectionCount');
+    
+    if (!barra || !contador) return;
+    
+    if (produtosSelecionados.size > 0) {
+      barra.classList.remove('d-none');
+      contador.textContent = produtosSelecionados.size;
+    } else {
+      barra.classList.add('d-none');
+    }
+  }
+  
+  async function excluirSelecionados() {
+    if (produtosSelecionados.size === 0) return;
+    
+    const confirmacao = confirm(`⚠️ Deseja excluir ${produtosSelecionados.size} produto(s) selecionado(s)?\n\nEsta ação não pode ser desfeita.`);
+    if (!confirmacao) return;
+    
+    try {
+      mostrarLoader(true);
+      
+      // Salvar para histórico de undo
+      const produtosParaExcluir = dadosEstoque.filter(p => produtosSelecionados.has(p.id));
+      adicionarHistorico('exclusaoMassa', produtosParaExcluir);
+      
+      // Excluir em lote
+      const promises = Array.from(produtosSelecionados).map(id =>
+        getCollection('estoque').doc(id).delete()
+      );
+      
+      await Promise.all(promises);
+      
+      // Registrar auditoria
+      await registrarLogAuditoria('exclusao_massa', {
+        quantidade: produtosSelecionados.size,
+        ids: Array.from(produtosSelecionados)
+      });
+      
+      mostrarToast(`✅ ${produtosSelecionados.size} produto(s) excluído(s) com sucesso!`, 'success');
+      
+      produtosSelecionados.clear();
+      await carregarEstoque();
+      atualizarMetricas();
+      
+    } catch (error) {
+      logger.error('Erro ao excluir produtos em massa', error);
+      mostrarToast('❌ Erro ao excluir produtos. Tente novamente.', 'error');
+    } finally {
+      mostrarLoader(false);
+    }
+  }
+  window.excluirSelecionados = excluirSelecionados;
+  
+  async function exportarSelecionados() {
+    if (produtosSelecionados.size === 0) {
+      mostrarToast('⚠️ Selecione produtos para exportar', 'warning');
+      return;
+    }
+    
+    try {
+      mostrarLoader(true);
+      
+      const produtosExportar = dadosEstoque.filter(p => produtosSelecionados.has(p.id));
+      
+      const wb = XLSX.utils.book_new();
+      
+      const dados = produtosExportar.map(p => ({
+        'Código': p.codigo || '',
+        'Produto': p.nome,
+        'Marca': p.marca,
+        'Lote': p.lote || '',
+        'Quantidade': p.quantidade,
+        'Est. Mínimo': p.estoqueMinimo || 0,
+        'Validade': formatDate(p.validade),
+        'Status': calcularStatus(p.validade) === 'vencido' ? 'VENCIDO' : calcularStatus(p.validade) === 'alerta' ? 'PRÓXIMO' : 'OK'
+      }));
+      
+      const ws = XLSX.utils.json_to_sheet(dados);
+      ws['!cols'] = [
+        { wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 15 },
+        { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 12 }
+      ];
+      
+      XLSX.utils.book_append_sheet(wb, ws, 'Selecionados');
+      
+      const nomeArquivo = `selecionados_${produtosSelecionados.size}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, nomeArquivo, { compression: true });
+      
+      mostrarToast(`✅ ${produtosSelecionados.size} produto(s) exportado(s)!`, 'success');
+      
+      await registrarLogAuditoria('exportacao_selecionados', {
+        quantidade: produtosSelecionados.size
+      });
+      
+    } catch (error) {
+      logger.error('Erro ao exportar selecionados', error);
+      mostrarToast('❌ Erro ao exportar', 'error');
+    } finally {
+      mostrarLoader(false);
+    }
+  }
+  window.exportarSelecionados = exportarSelecionados;
+  
+  function cancelarSelecao() {
+    produtosSelecionados.clear();
+    renderTabela(dadosEstoque);
+  }
+  window.cancelarSelecao = cancelarSelecao;
+  
+  // ================ IMPORTAÇÃO DE ARQUIVOS ================
+  
+  async function importarArquivo() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx, .xls, .csv';
+    
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      try {
+        mostrarLoader(true);
+        mostrarToast('📂 Lendo arquivo...', 'info');
+        
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data);
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+        
+        if (jsonData.length === 0) {
+          mostrarToast('⚠️ Arquivo vazio', 'warning');
+          return;
+        }
+        
+        // Validar e processar produtos
+        const produtosValidos = [];
+        const erros = [];
+        
+        for (let i = 0; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          const linha = i + 2; // +2 porque começa em 1 e tem cabeçalho
+          
+          // Extrair dados com nomes flexíveis
+          const nome = row['Produto'] || row['Nome'] || row['produto'] || row['nome'];
+          const marca = row['Marca'] || row['marca'];
+          const codigo = row['Código'] || row['Codigo'] || row['codigo'] || row['Código de Barras'];
+          const quantidade = Number(row['Quantidade'] || row['quantidade'] || row['Qtd'] || row['qtd']);
+          const validade = row['Validade'] || row['validade'];
+          const lote = row['Lote'] || row['lote'] || '';
+          const fornecedor = row['Fornecedor'] || row['fornecedor'] || '';
+          
+          // Validar campos obrigatórios
+          if (!nome) {
+            erros.push(`Linha ${linha}: Nome do produto é obrigatório`);
+            continue;
+          }
+          
+          if (!marca) {
+            erros.push(`Linha ${linha}: Marca é obrigatória`);
+            continue;
+          }
+          
+          if (!quantidade || quantidade <= 0) {
+            erros.push(`Linha ${linha}: Quantidade inválida`);
+            continue;
+          }
+          
+          if (!validade) {
+            erros.push(`Linha ${linha}: Validade é obrigatória`);
+            continue;
+          }
+          
+          // Processar data de validade
+          let dataValidade;
+          if (typeof validade === 'number') {
+            // Excel date serial
+            dataValidade = XLSX.SSF.parse_date_code(validade);
+            dataValidade = new Date(dataValidade.y, dataValidade.m - 1, dataValidade.d);
+          } else {
+            dataValidade = new Date(validade);
+          }
+          
+          if (isNaN(dataValidade.getTime())) {
+            erros.push(`Linha ${linha}: Data de validade inválida`);
+            continue;
+          }
+          
+          produtosValidos.push({
+            nome: sanitizeInput(nome),
+            marca: sanitizeInput(marca),
+            codigo: sanitizeInput(codigo || ''),
+            quantidade,
+            validade: dataValidade.toISOString().split('T')[0],
+            lote: sanitizeInput(lote),
+            fornecedor: sanitizeInput(fornecedor),
+            dataCadastro: new Date().toISOString()
+          });
+        }
+        
+        // Mostrar preview e confirmar
+        const confirmacao = confirm(
+          `📄 Importação:\n\n` +
+          `✅ Produtos válidos: ${produtosValidos.length}\n` +
+          `❌ Erros: ${erros.length}\n\n` +
+          (erros.length > 0 ? `Erros:\n${erros.slice(0, 5).join('\n')}${erros.length > 5 ? '\n...' : ''}\n\n` : '') +
+          `Deseja importar os ${produtosValidos.length} produto(s) válido(s)?`
+        );
+        
+        if (!confirmacao) {
+          mostrarToast('❌ Importação cancelada', 'info');
+          return;
+        }
+        
+        // Importar produtos
+        let importados = 0;
+        for (const produto of produtosValidos) {
+          try {
+            await getCollection('estoque').add(produto);
+            importados++;
+          } catch (error) {
+            logger.error('Erro ao importar produto', error);
+          }
+        }
+        
+        // Registrar auditoria
+        await registrarLogAuditoria('importacao', {
+          total: jsonData.length,
+          validos: produtosValidos.length,
+          importados,
+          erros: erros.length
+        });
+        
+        await carregarEstoque();
+        atualizarMetricas();
+        
+        mostrarToast(
+          `✅ ${importados} produto(s) importado(s) com sucesso!` +
+          (erros.length > 0 ? ` (${erros.length} erro(s))` : ''),
+          'success'
+        );
+        
+      } catch (error) {
+        logger.error('Erro ao importar arquivo', error);
+        mostrarToast('❌ Erro ao importar arquivo: ' + error.message, 'error');
+      } finally {
+        mostrarLoader(false);
+      }
+    };
+    
+    input.click();
+  }
+  window.importarArquivo = importarArquivo;
+  
+  // ================ HISTÓRICO E UNDO ================
+  
+  function adicionarHistorico(tipo, dados) {
+    historicoAcoes.push({
+      tipo,
+      dados,
+      timestamp: Date.now()
+    });
+    
+    if (historicoAcoes.length > MAX_HISTORICO) {
+      historicoAcoes.shift();
+    }
+  }
+  
+  async function desfazerUltimaAcao() {
+    if (historicoAcoes.length === 0) {
+      mostrarToast('⚠️ Nenhuma ação para desfazer', 'warning');
+      return;
+    }
+    
+    const ultimaAcao = historicoAcoes.pop();
+    
+    try {
+      mostrarLoader(true);
+      
+      if (ultimaAcao.tipo === 'exclusaoMassa') {
+        // Restaurar produtos excluídos
+        for (const produto of ultimaAcao.dados) {
+          await getCollection('estoque').doc(produto.id).set(produto);
+        }
+        mostrarToast(`✅ ${ultimaAcao.dados.length} produto(s) restaurado(s)!`, 'success');
+      }
+      
+      await carregarEstoque();
+      atualizarMetricas();
+      
+    } catch (error) {
+      logger.error('Erro ao desfazer ação', error);
+      mostrarToast('❌ Erro ao desfazer ação', 'error');
+    } finally {
+      mostrarLoader(false);
+    }
+  }
+  window.desfazerUltimaAcao = desfazerUltimaAcao;
 
   // ================ EXCEL ================
   /**
@@ -1930,14 +2578,60 @@ function getCollection(collectionName) {
    * @param {string} msg Mensagem a ser exibida
    * @param {boolean} erro Se true, mostra como erro
    */
-  function mostrarToast(msg, erro) {
-    var toast = document.getElementById('toast');
-    var body = document.getElementById('toast-body');
-    if (!toast || !body) return;
+  // Sistema de notificações profissional
+  const toastQueue = [];
+  let processingToast = false;
+
+  function mostrarToast(msg, tipo = 'success') {
+    toastQueue.push({ msg, tipo });
+    processToastQueue();
+  }
+
+  async function processToastQueue() {
+    if (processingToast || toastQueue.length === 0) return;
+    
+    processingToast = true;
+    const { msg, tipo } = toastQueue.shift();
+    
+    const toast = document.getElementById('toast');
+    const body = document.getElementById('toast-body');
+    
+    if (!toast || !body) {
+      processingToast = false;
+      return;
+    }
+    
+    // Mapear tipos para classes
+    const tipoClass = {
+      'success': 'success',
+      'error': 'error',
+      'warning': 'warning',
+      'info': 'info'
+    }[tipo] || 'success';
+    
+    // Determinar se é erro (compatibilidade com código antigo)
+    const isError = tipo === 'error' || tipo === true;
+    
     body.textContent = msg;
-    toast.className = 'toast ' + (erro ? 'error' : 'success');
+    toast.className = `toast ${isError ? 'error' : tipoClass}`;
     toast.classList.remove('d-none');
-    setTimeout(() => { toast.classList.add('d-none'); }, 3500);
+    
+    // Auto-hide com duração baseada no tipo
+    const duracao = tipo === 'error' ? 5000 : tipo === 'warning' ? 4000 : 3500;
+    
+    await new Promise(resolve => {
+      setTimeout(() => {
+        toast.classList.add('d-none');
+        resolve();
+      }, duracao);
+    });
+    
+    processingToast = false;
+    
+    // Processar próximo toast na fila
+    if (toastQueue.length > 0) {
+      setTimeout(() => processToastQueue(), 300);
+    }
   }
 
   // ================ GESTÃO DE PRODUTOS ================
@@ -2463,14 +3157,15 @@ function getCollection(collectionName) {
 
   // ================ ATALHOS DE TECLADO ================
   document.addEventListener('keydown', (e) => {
-    // Ignorar se estiver digitando em input/textarea
-    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    // Ignorar se estiver digitando em input/textarea (exceto atalhos com Ctrl/Cmd)
+    const isTyping = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
+    if (isTyping && !e.ctrlKey && !e.metaKey) return;
     
     // Ctrl/Cmd + K = Buscar produto
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault();
       if (auth.currentUser && document.getElementById('estoque').classList.contains('tela-ativa')) {
-        const inputBusca = document.getElementById('inputBusca');
+        const inputBusca = document.getElementById('buscaEstoque');
         if (inputBusca) {
           inputBusca.focus();
           inputBusca.select();
@@ -2483,26 +3178,138 @@ function getCollection(collectionName) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
       e.preventDefault();
       if (auth.currentUser && document.getElementById('estoque').classList.contains('tela-ativa')) {
-        const btnNovo = document.querySelector('button[onclick="salvarProduto()"]');
-        if (btnNovo) {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-          const primeiroCampo = document.getElementById('codigoProduto');
-          if (primeiroCampo) primeiroCampo.focus();
-          mostrarToast('💡 Novo produto - preencha os campos', 'info');
-        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const primeiroCampo = document.getElementById('codigoBarras');
+        if (primeiroCampo) primeiroCampo.focus();
+        mostrarToast('💡 Novo produto - preencha os campos', 'info');
       }
     }
     
-    // ESC = Fechar modals/limpar formulários
+    // Ctrl/Cmd + Z = Desfazer última ação
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+      e.preventDefault();
+      if (auth.currentUser && historicoAcoes.length > 0) {
+        desfazerUltimaAcao();
+      }
+    }
+    
+    // Ctrl/Cmd + A = Selecionar todos (na tela de estoque)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      if (auth.currentUser && document.getElementById('estoque').classList.contains('tela-ativa')) {
+        e.preventDefault();
+        selecionarTodos();
+      }
+    }
+    
+    // Delete = Excluir selecionados
+    if (e.key === 'Delete') {
+      if (auth.currentUser && produtosSelecionados.size > 0) {
+        e.preventDefault();
+        excluirSelecionados();
+      }
+    }
+    
+    // Ctrl/Cmd + E = Exportar selecionados
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+      if (auth.currentUser && produtosSelecionados.size > 0) {
+        e.preventDefault();
+        exportarSelecionados();
+      }
+    }
+    
+    // Ctrl/Cmd + H = Ajuda/Atalhos
+    if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+      e.preventDefault();
+      mostrarAjudaAtalhos();
+    }
+    
+    // ESC = Fechar modals/limpar seleção
     if (e.key === 'Escape') {
+      // Cancelar seleção se houver
+      if (produtosSelecionados.size > 0) {
+        cancelarSelecao();
+        mostrarToast('Seleção cancelada', 'info');
+      }
+      
       // Fechar scanner se estiver aberto
       const scanner = document.getElementById('scanner');
       if (scanner && !scanner.classList.contains('d-none')) {
         scanner.classList.add('d-none');
-        mostrarToast('Scanner fechado', 'info');
       }
     }
   });
+  
+  // Modal de ajuda de atalhos
+  function mostrarAjudaAtalhos() {
+    const atalhos = `
+      <div style="padding: 24px;">
+        <h3 style="margin-bottom: 20px; color: var(--primary);">⌨️ Atalhos de Teclado</h3>
+        
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px; font-size: 14px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <kbd style="padding: 4px 8px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px;">Ctrl/Cmd + K</kbd>
+          </div>
+          <div>Buscar produtos</div>
+          
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <kbd style="padding: 4px 8px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px;">Ctrl/Cmd + N</kbd>
+          </div>
+          <div>Novo produto</div>
+          
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <kbd style="padding: 4px 8px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px;">Ctrl/Cmd + A</kbd>
+          </div>
+          <div>Selecionar todos</div>
+          
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <kbd style="padding: 4px 8px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px;">Ctrl/Cmd + Z</kbd>
+          </div>
+          <div>Desfazer última ação</div>
+          
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <kbd style="padding: 4px 8px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px;">Ctrl/Cmd + E</kbd>
+          </div>
+          <div>Exportar selecionados</div>
+          
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <kbd style="padding: 4px 8px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px;">Delete</kbd>
+          </div>
+          <div>Excluir selecionados</div>
+          
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <kbd style="padding: 4px 8px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px;">ESC</kbd>
+          </div>
+          <div>Cancelar/Fechar</div>
+          
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <kbd style="padding: 4px 8px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px;">Ctrl/Cmd + H</kbd>
+          </div>
+          <div>Esta ajuda</div>
+        </div>
+        
+        <div style="margin-top: 20px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+          <small style="color: var(--text-secondary);">
+            💡 <strong>Dica:</strong> Use os atalhos para trabalhar mais rápido e aumentar sua produtividade!
+          </small>
+        </div>
+        
+        <button onclick="this.closest('.modal').remove()" class="btn btn-primary" style="margin-top: 20px; width: 100%;">
+          Entendi
+        </button>
+      </div>
+    `;
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999;';
+    modal.innerHTML = `<div style="background: var(--bg-card); border-radius: 12px; max-width: 600px; width: 90%; box-shadow: var(--shadow-lg);">${atalhos}</div>`;
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
+  }
+  window.mostrarAjudaAtalhos = mostrarAjudaAtalhos;
 
   // Expose functions used by inline handlers
   window.abrir = abrir;
@@ -2883,8 +3690,6 @@ async function migrarCatalogoParaEstoque() {
 }
 window.migrarCatalogoParaEstoque = migrarCatalogoParaEstoque;
 
-// ================= SCANNER DE CÓDIGO =================
-let scanner = null;
 // ================= SESSÃO =================
 auth.onAuthStateChanged(user => {
   if (user) abrir("menu");
@@ -3829,19 +4634,6 @@ async function salvarPerfilEmpresa() {
     mostrarLoader(false);
     console.error('Erro ao salvar perfil:', error);
     mostrarToast('❌ Erro ao salvar. Tente novamente.', 'error');
-  }
-}
-    
-    // Atualizar variável global
-    empresaAtual.nomeEmpresa = novoNome;
-    
-    // Atualizar header
-    document.getElementById('nomeEmpresa').textContent = novoNome;
-    
-    mostrarToast('✅ Perfil atualizado com sucesso!', 'success');
-  } catch (error) {
-    console.error('Erro ao salvar perfil:', error);
-    mostrarToast('❌ Erro ao salvar perfil', 'error');
   }
 }
 
