@@ -223,6 +223,36 @@
         </div>
       </button>
     </div>
+    <div class="col-md-6 col-lg-3" draggable="true" data-card="locais">
+      <button class="action-card glass-card w-100" onclick="abrir('locais')">
+        <div class="action-icon action-secondary">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
+        <div class="action-content">
+          <div class="action-title">📍 Locais</div>
+          <div class="action-desc">Armazenamento</div>
+        </div>
+      </button>
+    </div>
+    <div class="col-md-6 col-lg-3" draggable="true" data-card="usuarios" id="cardUsuarios">
+      <button class="action-card glass-card w-100" onclick="abrir('usuarios')">
+        <div class="action-icon action-primary">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div class="action-content">
+          <div class="action-title">👥 Usuários</div>
+          <div class="action-desc">Gerenciar equipe</div>
+        </div>
+      </button>
+    </div>
   </div>
 
   <!-- Ações Secundárias -->
@@ -368,6 +398,10 @@
       <input id="loteProduto" class="form-control mb-2" placeholder="Lote (opcional)" autocomplete="off" aria-label="Lote" tabindex="10">
       <label for="fornecedorProduto" class="visually-hidden">Fornecedor</label>
       <input id="fornecedorProduto" class="form-control mb-2" placeholder="Fornecedor (opcional)" autocomplete="off" aria-label="Fornecedor" tabindex="10">
+      <label for="localProduto" class="visually-hidden">Local de Armazenamento</label>
+      <select id="localProduto" class="form-select mb-2" aria-label="Local de Armazenamento" tabindex="10">
+        <option value="">📍 Local (opcional)</option>
+      </select>
       <label for="quantidadeProduto" class="visually-hidden">Quantidade</label>
       <input id="quantidadeProduto" type="number" class="form-control mb-2" placeholder="Quantidade" autocomplete="off" aria-label="Quantidade" tabindex="11">
       <label for="estoqueMinimo" class="visually-hidden">Estoque Mínimo</label>
@@ -618,6 +652,97 @@
 
   <div class="text-center mt-4">
     <button class="btn btn-outline-secondary btn-lg" onclick="voltar()">Voltar ao Menu</button>
+  </div>
+</section>
+
+<!-- ==================== 🆕 LOCAIS DE ARMAZENAMENTO ==================== -->
+<section id="locais" class="view-section" style="display:none;">
+  <div class="container py-4">
+    <h2 class="mb-4">📍 Locais de Armazenamento</h2>
+    
+    <!-- Formulário para adicionar local -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5 class="card-title">Adicionar Novo Local</h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label for="nomeLocal" class="form-label">Nome do Local *</label>
+            <input type="text" class="form-control" id="nomeLocal" placeholder="Ex: Prateleira A1, Geladeira 2" required>
+          </div>
+          <div class="col-md-6">
+            <label for="descricaoLocal" class="form-label">Descrição</label>
+            <input type="text" class="form-control" id="descricaoLocal" placeholder="Ex: Setor refrigerado">
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary" onclick="adicionarLocal()">
+              <i class="fas fa-plus"></i> Adicionar Local
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Lista de locais -->
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Locais Cadastrados</h5>
+        <div id="listaLocais" class="table-responsive">
+          <p class="text-muted">Carregando...</p>
+        </div>
+      </div>
+    </div>
+    
+    <button class="btn btn-outline-secondary btn-lg mt-3" onclick="voltar()">Voltar ao Menu</button>
+  </div>
+</section>
+
+<!-- ==================== 🆕 GERENCIAMENTO DE USUÁRIOS ==================== -->
+<section id="usuarios" class="view-section" style="display:none;">
+  <div class="container py-4">
+    <h2 class="mb-4">👥 Gerenciamento de Usuários</h2>
+    
+    <!-- Adicionar usuário -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5 class="card-title">Adicionar Novo Usuário</h5>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label for="nomeUsuario" class="form-label">Nome *</label>
+            <input type="text" class="form-control" id="nomeUsuario" placeholder="Nome completo" required>
+          </div>
+          <div class="col-md-4">
+            <label for="emailUsuario" class="form-label">Email *</label>
+            <input type="email" class="form-control" id="emailUsuario" placeholder="email@exemplo.com" required>
+          </div>
+          <div class="col-md-4">
+            <label for="perfilUsuario" class="form-label">Perfil *</label>
+            <select class="form-select" id="perfilUsuario" required>
+              <option value="">Selecione...</option>
+              <option value="admin">👑 Admin (Acesso Total)</option>
+              <option value="operador">👤 Operador (Entrada/Saída)</option>
+              <option value="visualizador">👁️ Visualizador (Somente Leitura)</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary" onclick="adicionarUsuario()">
+              <i class="fas fa-user-plus"></i> Adicionar Usuário
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Lista de usuários -->
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Usuários Cadastrados</h5>
+        <div id="listaUsuarios" class="table-responsive">
+          <p class="text-muted">Carregando...</p>
+        </div>
+      </div>
+    </div>
+    
+    <button class="btn btn-outline-secondary btn-lg mt-3" onclick="voltar()">Voltar ao Menu</button>
   </div>
 </section>
 

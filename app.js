@@ -116,6 +116,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     if (id === 'estoque') {
       carregarEstoque();
       carregarMarcas();
+      carregarLocais();
     }
 
     if (id === 'curvaABC') {
@@ -124,6 +125,14 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     
     if (id === 'historico') {
       carregarHistorico();
+    }
+    
+    if (id === 'locais') {
+      listarLocais();
+    }
+    
+    if (id === 'usuarios') {
+      listarUsuarios();
     }
     
     // move focus to main content for accessibility
@@ -644,6 +653,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       const categoria = document.getElementById('categoriaProduto').value;
       const lote = document.getElementById('loteProduto').value.trim();
       const fornecedor = document.getElementById('fornecedorProduto').value.trim();
+      const local = document.getElementById('localProduto')?.value || '';
       const quantidade = Number(document.getElementById('quantidadeProduto').value);
       const estoqueMinimo = Number(document.getElementById('estoqueMinimo').value || 0);
       const validadeInput = document.getElementById('validadeProduto').value;
@@ -672,7 +682,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       mostrarLoader(true);
       
       const dadosProduto = {
-        codigo, nome, marca, categoria, lote, fornecedor, quantidade, estoqueMinimo,
+        codigo, nome, marca, categoria, lote, fornecedor, local, quantidade, estoqueMinimo,
         validade: firebase.firestore.Timestamp.fromDate(new Date(validadeInput))
       };
       
@@ -684,7 +694,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
           tipo: 'edição',
           produto: nome,
           descricao: `Produto editado - ${nome}`,
-          usuario: auth.currentUser?.email || 'Sistema',
+          usuario: usuarioAtual?.nome || auth.currentUser?.email || 'Sistema',
           timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
         
@@ -2412,3 +2422,311 @@ document.addEventListener('DOMContentLoaded', () => {
     initDragAndDrop();
   }, 1500);
 });
+
+// ==================== 🆕 LOCAIS DE ARMAZENAMENTO ====================
+async function carregarLocais() {
+  try {
+    const select = document.getElementById('localProduto');
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">📍 Local (opcional)</option>';
+    
+    const snapshot = await db.collection('locais').orderBy('nome').get();
+    snapshot.forEach(doc => {
+      const local = doc.data();
+      const option = document.createElement('option');
+      option.value = local.nome;
+      option.textContent = `${local.nome}${local.descricao ? ' - ' + local.descricao : ''}`;
+      select.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Erro ao carregar locais:', error);
+  }
+}
+
+async function adicionarLocal() {
+  const nome = document.getElementById('nomeLocal').value.trim();
+  const descricao = document.getElementById('descricaoLocal').value.trim();
+  
+  if (!nome) {
+    alert('⚠️ Digite o nome do local!');
+    return;
+  }
+  
+  try {
+    mostrarLoader(true);
+    
+    // Verifica se já existe
+    const existe = await db.collection('locais').where('nome', '==', nome).get();
+    if (!existe.empty) {
+      alert('⚠️ Esse local já está cadastrado!');
+      mostrarLoader(false);
+      return;
+    }
+    
+    await db.collection('locais').add({
+      nome,
+      descricao,
+      criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    document.getElementById('nomeLocal').value = '';
+    document.getElementById('descricaoLocal').value = '';
+    
+    mostrarLoader(false);
+    mostrarToast('✅ Local adicionado com sucesso!');
+    listarLocais();
+    carregarLocais(); // Atualiza selects
+  } catch (error) {
+    console.error('Erro ao adicionar local:', error);
+    mostrarLoader(false);
+    alert('❌ Erro ao adicionar local: ' + error.message);
+  }
+}
+
+async function listarLocais() {
+  try {
+    const container = document.getElementById('listaLocais');
+    if (!container) return;
+    
+    const snapshot = await db.collection('locais').orderBy('nome').get();
+    
+    if (snapshot.empty) {
+      container.innerHTML = '<p class="text-muted">Nenhum local cadastrado.</p>';
+      return;
+    }
+    
+    let html = '<table class="table table-hover"><thead><tr><th>Nome</th><th>Descrição</th><th>Ações</th></tr></thead><tbody>';
+    
+    snapshot.forEach(doc => {
+      const local = doc.data();
+      html += `
+        <tr>
+          <td><strong>${local.nome}</strong></td>
+          <td>${local.descricao || '-'}</td>
+          <td>
+            <button class="btn btn-sm btn-danger" onclick="excluirLocal('${doc.id}', '${local.nome}')">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (error) {
+    console.error('Erro ao listar locais:', error);
+  }
+}
+
+async function excluirLocal(id, nome) {
+  if (!confirm(`⚠️ Excluir o local "${nome}"?\n\nOs produtos que estão neste local não serão excluídos.`)) {
+    return;
+  }
+  
+  try {
+    mostrarLoader(true);
+    await db.collection('locais').doc(id).delete();
+    mostrarLoader(false);
+    mostrarToast('✅ Local excluído!');
+    listarLocais();
+    carregarLocais();
+  } catch (error) {
+    console.error('Erro ao excluir local:', error);
+    mostrarLoader(false);
+    alert('❌ Erro ao excluir: ' + error.message);
+  }
+}
+
+// ==================== 🆕 GERENCIAMENTO DE USUÁRIOS ====================
+let usuarioAtual = null;
+
+// Carregar perfil do usuário atual
+async function carregarPerfilUsuario() {
+  const user = auth.currentUser;
+  if (!user) return null;
+  
+  try {
+    const snapshot = await db.collection('usuarios').where('email', '==', user.email).get();
+    
+    if (snapshot.empty) {
+      // Primeiro acesso - criar admin
+      const novoUsuario = {
+        nome: user.displayName || user.email.split('@')[0],
+        email: user.email,
+        perfil: 'admin',
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      await db.collection('usuarios').add(novoUsuario);
+      usuarioAtual = novoUsuario;
+      console.log('✅ Primeiro usuário criado como admin');
+    } else {
+      usuarioAtual = snapshot.docs[0].data();
+      console.log('👤 Usuário logado:', usuarioAtual.perfil);
+    }
+    
+    aplicarPermissoes();
+    return usuarioAtual;
+  } catch (error) {
+    console.error('Erro ao carregar perfil:', error);
+    return null;
+  }
+}
+
+function aplicarPermissoes() {
+  if (!usuarioAtual) return;
+  
+  const perfil = usuarioAtual.perfil;
+  
+  // Ocultar card de usuários se não for admin
+  const cardUsuarios = document.getElementById('cardUsuarios');
+  if (cardUsuarios && perfil !== 'admin') {
+    cardUsuarios.style.display = 'none';
+  }
+  
+  // Desabilitar botões de exclusão para visualizadores
+  if (perfil === 'visualizador') {
+    document.querySelectorAll('.btn-danger').forEach(btn => {
+      btn.disabled = true;
+      btn.title = 'Sem permissão para excluir';
+    });
+  }
+}
+
+async function adicionarUsuario() {
+  if (usuarioAtual?.perfil !== 'admin') {
+    alert('❌ Apenas administradores podem adicionar usuários!');
+    return;
+  }
+  
+  const nome = document.getElementById('nomeUsuario').value.trim();
+  const email = document.getElementById('emailUsuario').value.trim();
+  const perfil = document.getElementById('perfilUsuario').value;
+  
+  if (!nome || !email || !perfil) {
+    alert('⚠️ Preencha todos os campos!');
+    return;
+  }
+  
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    alert('⚠️ Email inválido!');
+    return;
+  }
+  
+  try {
+    mostrarLoader(true);
+    
+    // Verifica se já existe
+    const existe = await db.collection('usuarios').where('email', '==', email).get();
+    if (!existe.empty) {
+      alert('⚠️ Esse email já está cadastrado!');
+      mostrarLoader(false);
+      return;
+    }
+    
+    await db.collection('usuarios').add({
+      nome,
+      email,
+      perfil,
+      criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    document.getElementById('nomeUsuario').value = '';
+    document.getElementById('emailUsuario').value = '';
+    document.getElementById('perfilUsuario').value = '';
+    
+    mostrarLoader(false);
+    mostrarToast('✅ Usuário adicionado! Ele precisa fazer login para acessar.');
+    listarUsuarios();
+  } catch (error) {
+    console.error('Erro ao adicionar usuário:', error);
+    mostrarLoader(false);
+    alert('❌ Erro ao adicionar usuário: ' + error.message);
+  }
+}
+
+async function listarUsuarios() {
+  try {
+    const container = document.getElementById('listaUsuarios');
+    if (!container) return;
+    
+    const snapshot = await db.collection('usuarios').orderBy('nome').get();
+    
+    if (snapshot.empty) {
+      container.innerHTML = '<p class="text-muted">Nenhum usuário cadastrado.</p>';
+      return;
+    }
+    
+    let html = '<table class="table table-hover"><thead><tr><th>Nome</th><th>Email</th><th>Perfil</th><th>Ações</th></tr></thead><tbody>';
+    
+    snapshot.forEach(doc => {
+      const usuario = doc.data();
+      const badges = {
+        admin: '<span class="badge bg-danger">👑 Admin</span>',
+        operador: '<span class="badge bg-primary">👤 Operador</span>',
+        visualizador: '<span class="badge bg-secondary">👁️ Visualizador</span>'
+      };
+      
+      html += `
+        <tr>
+          <td><strong>${usuario.nome}</strong></td>
+          <td>${usuario.email}</td>
+          <td>${badges[usuario.perfil] || usuario.perfil}</td>
+          <td>
+            <button class="btn btn-sm btn-warning" onclick="editarUsuario('${doc.id}')">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="excluirUsuario('${doc.id}', '${usuario.nome}')">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (error) {
+    console.error('Erro ao listar usuários:', error);
+  }
+}
+
+async function excluirUsuario(id, nome) {
+  if (usuarioAtual?.perfil !== 'admin') {
+    alert('❌ Apenas administradores podem excluir usuários!');
+    return;
+  }
+  
+  if (!confirm(`⚠️ Excluir o usuário "${nome}"?`)) {
+    return;
+  }
+  
+  try {
+    mostrarLoader(true);
+    await db.collection('usuarios').doc(id).delete();
+    mostrarLoader(false);
+    mostrarToast('✅ Usuário excluído!');
+    listarUsuarios();
+  } catch (error) {
+    console.error('Erro ao excluir usuário:', error);
+    mostrarLoader(false);
+    alert('❌ Erro ao excluir: ' + error.message);
+  }
+}
+
+// Carregar perfil ao fazer login
+auth.onAuthStateChanged(user => {
+  if (user) {
+    carregarPerfilUsuario();
+    carregarLocais();
+  }
+});
+
+// Expor funções globalmente
+window.adicionarLocal = adicionarLocal;
+window.listarLocais = listarLocais;
+window.excluirLocal = excluirLocal;
+window.adicionarUsuario = adicionarUsuario;
+window.listarUsuarios = listarUsuarios;
+window.excluirUsuario = excluirUsuario;
