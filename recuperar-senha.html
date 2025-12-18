@@ -234,15 +234,30 @@
       await auth.sendPasswordResetEmail(email);
       
       mostrarLoader(false);
-      mostrarAlerta('✅ Email de recuperação enviado! Verifique sua caixa de entrada (e spam).', 'success');
+      mostrarAlerta('✅ Email de recuperação enviado com sucesso!\n\n📧 Verifique sua caixa de entrada (e spam).\n\n⏱️ Redirecionando em 5 segundos...', 'success');
       
       // Limpar campo
       document.getElementById('emailRecuperar').value = '';
       
-      // Redirecionar após 3 segundos
-      setTimeout(() => {
-        window.location.href = 'index.html';
-      }, 3000);
+      // Desabilitar botão para evitar reenvios
+      const btnEnviar = document.querySelector('button[onclick="enviarRecuperacao()"]');
+      if (btnEnviar) {
+        btnEnviar.disabled = true;
+        btnEnviar.style.opacity = '0.5';
+      }
+      
+      // Redirecionar após 5 segundos
+      let countdown = 5;
+      const alertDiv = document.getElementById('alert');
+      const interval = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+          alertDiv.textContent = `✅ Email enviado! Redirecionando em ${countdown}s...`;
+        } else {
+          clearInterval(interval);
+          window.location.href = 'index.html';
+        }
+      }, 1000);
       
     } catch (error) {
       mostrarLoader(false);
