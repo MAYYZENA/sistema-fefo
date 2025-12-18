@@ -110,7 +110,9 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   // Toggle sidebar em mobile
   window.toggleSidebar = function() {
     const sidebar = document.getElementById('sidebar');
-    sidebar.classList.toggle('active');
+    if (sidebar) {
+      sidebar.classList.toggle('active');
+    }
   }
 
   // Fechar sidebar ao clicar fora (mobile)
@@ -2953,6 +2955,14 @@ async function excluirUsuario(id, nome) {
     alert('❌ Erro ao excluir: ' + error.message);
   }
 }
+
+function editarUsuario(id) {
+  alert('🛠️ Função de edição em desenvolvimento. Por enquanto, exclua e crie novamente.');
+}
+
+// Expor funções no escopo global
+window.excluirUsuario = excluirUsuario;
+window.editarUsuario = editarUsuario;
 
 // Carregar perfil ao fazer login
 auth.onAuthStateChanged(user => {
