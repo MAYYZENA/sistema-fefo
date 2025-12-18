@@ -259,7 +259,37 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
         const nomeProduto = produto.product_name || produto.product_name_pt || produto.generic_name || '';
         const marca = produto.brands || '';
         
-        // Preenche os campos automaticamente
+        // 🆕 BUSCA INTELIGENTE NO CATÁLOGO ANTES DE PREENCHER
+        if (nomeProduto) {
+          console.log('🧠 Tentando busca inteligente no catálogo...');
+          const produtoInteligente = await buscarProdutoInteligenteNoCatalogo(nomeProduto, marca);
+          
+          if (produtoInteligente) {
+            // ENCONTROU! Preenche com dados do catálogo e associa o código
+            console.log('🎯 MATCH AUTOMÁTICO!', produtoInteligente.nome);
+            document.getElementById('nomeProduto').value = produtoInteligente.nome;
+            
+            if (produtoInteligente.marca) {
+              document.getElementById('marcaProduto').value = produtoInteligente.marca;
+            }
+            if (produtoInteligente.categoria) {
+              document.getElementById('categoriaProduto').value = produtoInteligente.categoria;
+            }
+            if (produtoInteligente.fornecedor) {
+              document.getElementById('fornecedorProduto').value = produtoInteligente.fornecedor;
+            }
+            
+            // ASSOCIA O CÓDIGO DE BARRAS AO PRODUTO DO CATÁLOGO
+            await db.collection('catalogo-produtos').doc(produtoInteligente.id).update({ codigo });
+            console.log('✅ Código associado ao produto do catálogo!');
+            
+            mostrarLoader(false);
+            mostrarToast('✅ Produto encontrado e associado automaticamente!');
+            return;
+          }
+        }
+        
+        // Se não encontrou match inteligente, preenche com dados da API
         if (nomeProduto) {
           document.getElementById('nomeProduto').value = nomeProduto;
           console.log('✅ Nome preenchido:', nomeProduto);
@@ -306,6 +336,37 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
           const nomeProduto = data.description || '';
           const marca = data.brand?.name || '';
           
+          // 🆕 BUSCA INTELIGENTE NO CATÁLOGO ANTES DE PREENCHER
+          if (nomeProduto) {
+            console.log('🧠 Tentando busca inteligente no catálogo (Cosmos)...');
+            const produtoInteligente = await buscarProdutoInteligenteNoCatalogo(nomeProduto, marca);
+            
+            if (produtoInteligente) {
+              // ENCONTROU! Preenche com dados do catálogo e associa o código
+              console.log('🎯 MATCH AUTOMÁTICO (Cosmos)!', produtoInteligente.nome);
+              document.getElementById('nomeProduto').value = produtoInteligente.nome;
+              
+              if (produtoInteligente.marca) {
+                document.getElementById('marcaProduto').value = produtoInteligente.marca;
+              }
+              if (produtoInteligente.categoria) {
+                document.getElementById('categoriaProduto').value = produtoInteligente.categoria;
+              }
+              if (produtoInteligente.fornecedor) {
+                document.getElementById('fornecedorProduto').value = produtoInteligente.fornecedor;
+              }
+              
+              // ASSOCIA O CÓDIGO DE BARRAS AO PRODUTO DO CATÁLOGO
+              await db.collection('catalogo-produtos').doc(produtoInteligente.id).update({ codigo });
+              console.log('✅ Código associado ao produto do catálogo!');
+              
+              mostrarLoader(false);
+              mostrarToast('✅ Produto encontrado e associado automaticamente!');
+              return;
+            }
+          }
+          
+          // Se não encontrou match inteligente, preenche com dados da API
           if (nomeProduto) {
             document.getElementById('nomeProduto').value = nomeProduto;
             console.log('✅ Nome preenchido (Cosmos):', nomeProduto);
@@ -511,6 +572,100 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
         resolve(null);
       });
     });
+  }
+  
+  // 🆕 Busca inteligente no catálogo por similaridade de nome
+  async function buscarProdutoInteligenteNoCatalogo(nomeProdutoAPI, marcaAPI) {
+    try {
+      console.log(`🧠 Busca inteligente: "${nomeProdutoAPI}" marca: "${marcaAPI}"`);
+      
+      // Extrai palavras-chave do nome (remove palavras comuns)
+      const palavrasComuns = ['de', 'com', 'em', 'para', 'sem', 'e', 'a', 'o', 'da', 'do', 'das', 'dos'];
+      const palavrasChave = nomeProdutoAPI
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(p => p.length > 3 && !palavrasComuns.includes(p))
+        .slice(0, 3); // Pega as 3 primeiras palavras relevantes
+      
+      console.log('Palavras-chave extraídas:', palavrasChave);
+      
+      if (palavrasChave.length === 0) {
+        return null;
+      }
+      
+      // Busca produtos no catálogo sem código
+      const catalogoSnap = await db.collection('catalogo-produtos')
+        .where('codigo', '==', '')
+        .get();
+      
+      if (catalogoSnap.empty) {
+        console.log('Catálogo vazio');
+        return null;
+      }
+      
+      // Analisa cada produto do catálogo
+      const candidatos = [];
+      catalogoSnap.forEach(doc => {
+        const produto = { id: doc.id, ...doc.data() };
+        const nomeCatalogo = produto.nome.toLowerCase();
+        const marcaCatalogo = (produto.marca || '').toLowerCase();
+        const marcaAPILower = (marcaAPI || '').toLowerCase();
+        
+        // Calcula score de similaridade
+        let score = 0;
+        
+        // +30 pontos se a marca bater
+        if (marcaCatalogo && marcaAPILower && marcaCatalogo === marcaAPILower) {
+          score += 30;
+        }
+        
+        // +20 pontos por cada palavra-chave que aparecer no nome
+        palavrasChave.forEach(palavra => {
+          if (nomeCatalogo.includes(palavra)) {
+            score += 20;
+          }
+        });
+        
+        // Salva candidato se tiver score > 0
+        if (score > 0) {
+          candidatos.push({ produto, score });
+          console.log(`Candidato: "${produto.nome}" (${produto.marca}) - Score: ${score}`);
+        }
+      });
+      
+      // Ordena por score (maior primeiro)
+      candidatos.sort((a, b) => b.score - a.score);
+      
+      if (candidatos.length === 0) {
+        console.log('❌ Nenhum candidato encontrado');
+        return null;
+      }
+      
+      // Se o melhor candidato tem score alto (>= 40), retorna automaticamente
+      const melhor = candidatos[0];
+      if (melhor.score >= 40) {
+        console.log(`✅ Match automático! "${melhor.produto.nome}" - Score: ${melhor.score}`);
+        return melhor.produto;
+      }
+      
+      // Se tem vários candidatos com score similar, não decide sozinho
+      if (candidatos.length > 1 && candidatos[1].score >= 30) {
+        console.log('⚠️ Múltiplos candidatos com score alto, requer escolha manual');
+        return null;
+      }
+      
+      // Retorna o melhor se for único com score razoável
+      if (melhor.score >= 20) {
+        console.log(`✅ Melhor candidato: "${melhor.produto.nome}" - Score: ${melhor.score}`);
+        return melhor.produto;
+      }
+      
+      return null;
+      
+    } catch (error) {
+      console.error('Erro na busca inteligente:', error);
+      return null;
+    }
   }
   
   // Expor função globalmente para uso no HTML
