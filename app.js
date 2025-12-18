@@ -292,46 +292,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
         console.log('⚠️ Open Food Facts falhou:', e.message);
       }
       
-      // API 2: UPC Database
-      try {
-        console.log('📡 Tentando UPC Database...');
-        let response = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${codigo}`);
-        let data = await response.json();
-        
-        if (data.items && data.items.length > 0) {
-          const item = data.items[0];
-          const nomeProduto = item.title || '';
-          const marca = item.brand || '';
-          
-          if (nomeProduto) {
-            console.log('✅ UPC Database encontrou:', nomeProduto);
-            const produtoInteligente = await buscarProdutoInteligenteNoCatalogo(nomeProduto, marca);
-            
-            if (produtoInteligente) {
-              console.log('🎯 MATCH AUTOMÁTICO!', produtoInteligente.nome);
-              document.getElementById('nomeProduto').value = produtoInteligente.nome;
-              if (produtoInteligente.marca) document.getElementById('marcaProduto').value = produtoInteligente.marca;
-              if (produtoInteligente.categoria) document.getElementById('categoriaProduto').value = produtoInteligente.categoria;
-              if (produtoInteligente.fornecedor) document.getElementById('fornecedorProduto').value = produtoInteligente.fornecedor;
-              
-              await db.collection('catalogo-produtos').doc(produtoInteligente.id).update({ codigo });
-              mostrarLoader(false);
-              mostrarToast('✅ Produto encontrado e associado automaticamente!');
-              return;
-            }
-            
-            document.getElementById('nomeProduto').value = nomeProduto;
-            if (marca) document.getElementById('marcaProduto').value = marca;
-            mostrarLoader(false);
-            mostrarToast('✅ Produto encontrado no UPC Database!');
-            return;
-          }
-        }
-      } catch (e) {
-        console.log('⚠️ UPC Database falhou:', e.message);
-      }
-      
-      // API 3: World of EAN
+      // API 2: World of EAN
       try {
         console.log('📡 Tentando World of EAN...');
         let response = await fetch(`https://world.openfoodfacts.net/api/v2/product/${codigo}`);
