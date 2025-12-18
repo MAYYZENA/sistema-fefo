@@ -363,6 +363,37 @@ function getCollection(collectionName) {
         }
       }
       
+      // Registrar log de auditoria - login bem-sucedido
+      try {
+        await db.collection('usuarios').doc(user.uid).collection('logs_auditoria').add({
+          tipo: 'login',
+          status: 'sucesso',
+          email: user.email,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          userAgent: navigator.userAgent,
+          plataforma: navigator.platform
+        });
+      } catch (logError) {
+        console.error('Erro ao registrar log:', logError);
+      }
+      
+      // Verificar se precisa fazer backup (30 dias)
+      verificarBackupPendente();
+          email: user.email,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          userAgent: navigator.userAgent,
+          plataforma: navigator.platform
+        });
+      } catch (logError) {
+        console.error('Erro ao registrar log:', logError);
+      }
+      
+      // Verificar se precisa fazer backup (30 dias)
+      verificarBackupPendente();
+      
+      // Iniciar timeout de sessão
+      resetarTimeoutSessao();
+      
       abrir('menu');
       atualizarMetricas();
       mostrarToast('Login realizado com sucesso!', false);
@@ -385,6 +416,13 @@ function getCollection(collectionName) {
     } catch (e) { 
       mostrarLoader(false);
       tentativasLogin++;
+      
+      // Registrar log de auditoria - login falhou
+      const emailTentativa = document.getElementById('email')?.value || 'desconhecido';
+      await registrarLogAuditoria('login', 'falha', {
+        email: emailTentativa,
+        erro: e.code || 'erro_desconhecido'
+      });
       
       // Mensagens de erro genéricas (segurança)
       if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') {
@@ -457,6 +495,18 @@ function getCollection(collectionName) {
       
       const userCredential = await auth.createUserWithEmailAndPassword(email, senha);
       const user = userCredential.user;
+      
+      // Enviar email de verificação
+      try {
+        await user.sendEmailVerification({
+          url: window.location.origin + '/index.html',
+          handleCodeInApp: false
+        });
+        mostrarToast('✉️ Email de verificação enviado! Verifique sua caixa de entrada.', 'info');
+      } catch (emailError) {
+        console.error('Erro ao enviar email de verificação:', emailError);
+        // Não bloqueia o registro se falhar
+      }
       
       // Criar perfil da empresa
       await db.collection('usuarios').doc(user.uid).set({
@@ -1060,6 +1110,81 @@ function getCollection(collectionName) {
   // Expor função globalmente para uso no HTML
   window.buscarProdutoPorCodigoBarras = buscarProdutoPorCodigoBarras;
   
+  // ================ LOGS DE AUDITORIA ================
+  async function registrarLogAuditoria(tipo, status, dados = {}) {
+    try {
+      if (!auth.currentUser) return;
+      
+      const logData = {
+        tipo: tipo, // 'login', 'registro', 'alteracao', 'exclusao'
+        status: status, // 'sucesso', 'falha'
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        userAgent: navigator.userAgent,
+        plataforma: navigator.platform,
+        ...dados
+      };
+      
+      await db.collection('usuarios')
+        .doc(auth.currentUser.uid)
+        .collection('logs_auditoria')
+        .add(logData);
+        
+    } catch (error) {
+      console.error('Erro ao registrar log:', error);
+      // Não bloqueia operação principal se log falhar
+    }
+  }
+  
+  // ================ BACKUP AUTOMÁTICO ================
+  async function verificarBackupPendente() {
+    try {
+      if (!auth.currentUser) return;
+      
+      const empresaDoc = await db.collection('usuarios').doc(auth.currentUser.uid).get();
+      const dados = empresaDoc.data();
+      
+      if (!dados.ultimoBackup) {
+        // Primeiro acesso - definir data atual
+        await db.collection('usuarios').doc(auth.currentUser.uid).update({
+          ultimoBackup: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        return;
+      }
+      
+      const ultimoBackup = dados.ultimoBackup.toDate();
+      const hoje = new Date();
+      const diasDesdeBackup = Math.floor((hoje - ultimoBackup) / (1000 * 60 * 60 * 24));
+      
+      // Lembrar a cada 30 dias
+      if (diasDesdeBackup >= 30) {
+        setTimeout(() => {
+          const confirmar = confirm(
+            '💾 Lembrete de Backup!\n\n' +
+            `Faz ${diasDesdeBackup} dias desde seu último backup.\n\n` +
+            'Recomendamos exportar seus dados regularmente.\n\n' +
+            'Deseja exportar agora?'
+          );
+          
+          if (confirmar) {
+            // Abrir tela de estoque e disparar exportação
+            abrir('estoque');
+            setTimeout(() => {
+              if (typeof exportarExcel === 'function') {
+                exportarExcel();
+                // Atualizar data do último backup
+                db.collection('usuarios').doc(auth.currentUser.uid).update({
+                  ultimoBackup: firebase.firestore.FieldValue.serverTimestamp()
+                });
+              }
+            }, 500);
+          }
+        }, 3000); // Mostrar após 3 segundos do login
+      }
+    } catch (error) {
+      console.error('Erro ao verificar backup:', error);
+    }
+  }
+  
   function abrirScanner() {
     const container = document.getElementById('scanner');
     if (!container) return;
@@ -1234,9 +1359,31 @@ function getCollection(collectionName) {
   }
 
   function filtrarEstoque() {
-    const texto = (document.getElementById('buscaEstoque').value || '').toLowerCase();
+    const texto = (document.getElementById('buscaEstoque').value || '').toLowerCase().trim();
     const marca = document.getElementById('filtroMarca').value;
-    const filtrado = dadosEstoque.filter(p => (!marca || p.marca === marca) && (p.nome.toLowerCase().includes(texto) || p.marca.toLowerCase().includes(texto) || (p.codigo || '').includes(texto)) );
+    
+    // Busca inteligente - aceita busca parcial em múltiplos campos
+    const filtrado = dadosEstoque.filter(p => {
+      // Filtro de marca
+      const matchMarca = !marca || p.marca === marca;
+      
+      // Busca inteligente - verifica em nome, marca, código e lote
+      let matchBusca = true;
+      if (texto) {
+        const nome = (p.nome || '').toLowerCase();
+        const marcaProd = (p.marca || '').toLowerCase();
+        const codigo = (p.codigo || '').toLowerCase();
+        const lote = (p.lote || '').toLowerCase();
+        
+        matchBusca = nome.includes(texto) || 
+                    marcaProd.includes(texto) || 
+                    codigo.includes(texto) ||
+                    lote.includes(texto);
+      }
+      
+      return matchMarca && matchBusca;
+    });
+    
     renderTabela(filtrado);
   }
 
