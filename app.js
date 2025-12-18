@@ -2414,16 +2414,32 @@ async function carregarLocais() {
     
     select.innerHTML = '<option value="">📍 Local (opcional)</option>';
     
-    const snapshot = await db.collection('locais').orderBy('nome').get();
+    const snapshot = await db.collection('locais').get();
+    
+    if (snapshot.empty) {
+      console.log('Nenhum local cadastrado ainda');
+      return;
+    }
+    
+    const locais = [];
     snapshot.forEach(doc => {
-      const local = doc.data();
+      locais.push(doc.data());
+    });
+    
+    // Ordena localmente
+    locais.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+    
+    locais.forEach(local => {
       const option = document.createElement('option');
       option.value = local.nome;
       option.textContent = `${local.nome}${local.descricao ? ' - ' + local.descricao : ''}`;
       select.appendChild(option);
     });
+    
+    console.log(`✅ ${locais.length} locais carregados`);
   } catch (error) {
     console.error('Erro ao carregar locais:', error);
+    // Não bloqueia o uso mesmo se der erro
   }
 }
 
@@ -2472,23 +2488,30 @@ async function listarLocais() {
     const container = document.getElementById('listaLocais');
     if (!container) return;
     
-    const snapshot = await db.collection('locais').orderBy('nome').get();
+    const snapshot = await db.collection('locais').get();
     
     if (snapshot.empty) {
       container.innerHTML = '<p class="text-muted">Nenhum local cadastrado.</p>';
       return;
     }
     
+    const locais = [];
+    snapshot.forEach(doc => {
+      locais.push({ id: doc.id, ...doc.data() });
+    });
+    
+    // Ordena localmente
+    locais.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+    
     let html = '<table class="table table-hover"><thead><tr><th>Nome</th><th>Descrição</th><th>Ações</th></tr></thead><tbody>';
     
-    snapshot.forEach(doc => {
-      const local = doc.data();
+    locais.forEach(local => {
       html += `
         <tr>
           <td><strong>${local.nome}</strong></td>
           <td>${local.descricao || '-'}</td>
           <td>
-            <button class="btn btn-sm btn-danger" onclick="excluirLocal('${doc.id}', '${local.nome}')">
+            <button class="btn btn-sm btn-danger" onclick="excluirLocal('${local.id}', '${local.nome}')">
               <i class="fas fa-trash"></i>
             </button>
           </td>
