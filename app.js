@@ -277,10 +277,24 @@ function getCollection(collectionName) {
       // Atualizar badge do plano no header
       atualizarBadgePlano();
       
+      // Debug: Verificar se é admin
+      console.log('🔐 Dados da empresa:', empresaAtual);
+      console.log('🔐 É admin?', empresaAtual.isAdmin);
+      
       // Mostrar menu admin se for administrador
-      if (empresaAtual.isAdmin) {
+      if (empresaAtual.isAdmin === true) {
+        console.log('✅ Usuário é ADMIN! Mostrando menu...');
         const menuAdmin = document.getElementById('menuAdmin');
-        if (menuAdmin) menuAdmin.classList.remove('d-none');
+        console.log('📍 Elemento menuAdmin:', menuAdmin);
+        if (menuAdmin) {
+          menuAdmin.classList.remove('d-none');
+          menuAdmin.style.display = 'block';
+          console.log('✅ Menu admin ativado!');
+        } else {
+          console.error('❌ Elemento menuAdmin não encontrado no HTML!');
+        }
+      } else {
+        console.log('ℹ️ Usuário NÃO é admin. isAdmin =', empresaAtual.isAdmin);
       }
       
       abrir('menu');
