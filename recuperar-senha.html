@@ -196,20 +196,6 @@
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   
-  // Desregistrar service workers antigos
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(registrations => {
-      registrations.forEach(registration => registration.unregister());
-    });
-  }
-  
-  // Limpar cache do navegador
-  if ('caches' in window) {
-    caches.keys().then(names => {
-      names.forEach(name => caches.delete(name));
-    });
-  }
-  
   function mostrarAlerta(mensagem, tipo) {
     const alert = document.getElementById('alert');
     alert.textContent = mensagem;
@@ -244,10 +230,8 @@
     try {
       mostrarLoader(true);
       
-      await auth.sendPasswordResetEmail(email, {
-        url: window.location.origin + '/index.html',
-        handleCodeInApp: false
-      });
+      // Enviar email de recuperação (sem URL de redirecionamento)
+      await auth.sendPasswordResetEmail(email);
       
       mostrarLoader(false);
       mostrarAlerta('✅ Email de recuperação enviado! Verifique sua caixa de entrada (e spam).', 'success');
