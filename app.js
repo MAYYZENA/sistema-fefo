@@ -1569,6 +1569,9 @@ function getCollection(collectionName) {
           timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
         
+        // Registrar analytics
+        registrarAcao('adicionar', { produto: nome, quantidade });
+        
         mostrarLoader(false);
         mostrarToast('Produto salvo com sucesso!');
       }
@@ -1579,11 +1582,13 @@ function getCollection(collectionName) {
   }
 
   // ================ LISTAGEM / FILTRO ================
-  let dadosEstoque = [];
+  // Variável global para armazenar os dados do estoque
+  window.dadosEstoque = [];
+  
   async function carregarEstoque() {
     try {
       mostrarLoader(true);
-      dadosEstoque = [];
+      window.dadosEstoque = [];
       const tabela = document.getElementById('tabelaEstoque'); if (!tabela) { mostrarLoader(false); return; }
       tabela.innerHTML = '';
       const snap = await getCollection('estoque').orderBy('validade','asc').get();
@@ -1591,9 +1596,9 @@ function getCollection(collectionName) {
         const p = doc.data();
         p.id = doc.id; // Adiciona ID do documento para edição/exclusão
         const validadeDate = (p.validade && p.validade.toDate) ? p.validade.toDate() : (p.validade || null);
-        dadosEstoque.push({ ...p, validade: validadeDate });
+        window.dadosEstoque.push({ ...p, validade: validadeDate });
       });
-      renderTabela(dadosEstoque);
+      renderTabela(window.dadosEstoque);
       mostrarLoader(false);
     } catch (e) { mostrarLoader(false); handleError(e); }
   }
@@ -1654,7 +1659,7 @@ function getCollection(collectionName) {
     }
     
     // Busca inteligente com múltiplos filtros
-    const filtrado = dadosEstoque.filter(p => {
+    const filtrado = window.dadosEstoque.filter(p => {
       // Filtro de marca
       const matchMarca = !marca || p.marca === marca;
       
@@ -1689,7 +1694,7 @@ function getCollection(collectionName) {
     renderTabela(filtrado);
     
     // Mostrar contador de resultados
-    const total = dadosEstoque.length;
+    const total = window.dadosEstoque.length;
     if (filtrado.length < total) {
       mostrarToast(`🔍 ${filtrado.length} de ${total} produtos`, 'info');
     }
@@ -1731,7 +1736,7 @@ function getCollection(collectionName) {
       });
     }
     
-    renderTabela(dadosEstoque);
+    renderTabela(window.dadosEstoque);
   }
   window.selecionarTodos = selecionarTodos;
   
@@ -1759,7 +1764,7 @@ function getCollection(collectionName) {
       mostrarLoader(true);
       
       // Salvar para histórico de undo
-      const produtosParaExcluir = dadosEstoque.filter(p => produtosSelecionados.has(p.id));
+      const produtosParaExcluir = window.dadosEstoque.filter(p => produtosSelecionados.has(p.id));
       adicionarHistorico('exclusaoMassa', produtosParaExcluir);
       
       // Excluir em lote
@@ -1799,7 +1804,7 @@ function getCollection(collectionName) {
     try {
       mostrarLoader(true);
       
-      const produtosExportar = dadosEstoque.filter(p => produtosSelecionados.has(p.id));
+      const produtosExportar = window.dadosEstoque.filter(p => produtosSelecionados.has(p.id));
       
       const wb = XLSX.utils.book_new();
       
@@ -1842,7 +1847,7 @@ function getCollection(collectionName) {
   
   function cancelarSelecao() {
     produtosSelecionados.clear();
-    renderTabela(dadosEstoque);
+    renderTabela(window.dadosEstoque);
   }
   window.cancelarSelecao = cancelarSelecao;
   
@@ -1990,6 +1995,281 @@ function getCollection(collectionName) {
   }
   window.importarArquivo = importarArquivo;
   
+  // ================ NOTIFICAÇÕES INTELIGENTES ================
+  
+  let notificacoesAtivas = [];
+  let notificacoesLidas = new Set();
+  
+  // Verificar e criar notificações
+  async function verificarNotificacoes() {
+    if (!auth.currentUser) return;
+    
+    try {
+      const snap = await getCollection('estoque').get();
+      const novasNotificacoes = [];
+      const hoje = new Date();
+      const em3Dias = new Date(hoje.getTime() + 3 * 24 * 60 * 60 * 1000);
+      const em7Dias = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      snap.forEach(doc => {
+        const p = { id: doc.id, ...doc.data() };
+        const validade = new Date(p.validade);
+        const estoqueMin = p.estoqueMinimo || 0;
+        
+        // Notificação: Produto vencido
+        if (validade < hoje) {
+          novasNotificacoes.push({
+            id: `vencido_${p.id}`,
+            tipo: 'vencido',
+            prioridade: 'alta',
+            titulo: '❌ Produto Vencido',
+            mensagem: `${p.nome} (${p.marca}) venceu em ${formatDate(p.validade)}`,
+            produtoId: p.id,
+            timestamp: Date.now(),
+            acao: () => editarProduto(p.id)
+          });
+        }
+        // Notificação: Vence em 3 dias (urgente)
+        else if (validade <= em3Dias) {
+          novasNotificacoes.push({
+            id: `urgente_${p.id}`,
+            tipo: 'urgente',
+            prioridade: 'alta',
+            titulo: '⚠️ Vencimento Urgente',
+            mensagem: `${p.nome} vence em ${calcularDiasVencimento(p.validade)} dia(s)!`,
+            produtoId: p.id,
+            timestamp: Date.now(),
+            acao: () => editarProduto(p.id)
+          });
+        }
+        // Notificação: Vence em 7 dias
+        else if (validade <= em7Dias) {
+          novasNotificacoes.push({
+            id: `alerta_${p.id}`,
+            tipo: 'alerta',
+            prioridade: 'media',
+            titulo: '🚨 Atenção ao Vencimento',
+            mensagem: `${p.nome} vence em ${calcularDiasVencimento(p.validade)} dia(s)`,
+            produtoId: p.id,
+            timestamp: Date.now(),
+            acao: () => editarProduto(p.id)
+          });
+        }
+        
+        // Notificação: Estoque baixo
+        if (estoqueMin > 0 && p.quantidade <= estoqueMin) {
+          novasNotificacoes.push({
+            id: `estoque_${p.id}`,
+            tipo: 'estoque',
+            prioridade: p.quantidade === 0 ? 'alta' : 'media',
+            titulo: p.quantidade === 0 ? '🚫 Estoque Zerado' : '📦 Estoque Baixo',
+            mensagem: `${p.nome}: ${p.quantidade} unidade(s) (mínimo: ${estoqueMin})`,
+            produtoId: p.id,
+            timestamp: Date.now(),
+            acao: () => editarProduto(p.id)
+          });
+        }
+      });
+      
+      // Filtrar notificações já lidas
+      notificacoesAtivas = novasNotificacoes.filter(n => !notificacoesLidas.has(n.id));
+      
+      // Ordenar por prioridade e timestamp
+      notificacoesAtivas.sort((a, b) => {
+        const prioridadeValor = { alta: 3, media: 2, baixa: 1 };
+        const prioA = prioridadeValor[a.prioridade] || 0;
+        const prioB = prioridadeValor[b.prioridade] || 0;
+        if (prioA !== prioB) return prioB - prioA;
+        return b.timestamp - a.timestamp;
+      });
+      
+      atualizarBadgeNotificacoes();
+      
+      // Auto-mostrar se houver notificações urgentes não lidas
+      const urgentes = notificacoesAtivas.filter(n => n.prioridade === 'alta' && !notificacoesLidas.has(n.id));
+      if (urgentes.length > 0 && document.getElementById('menu')?.classList.contains('tela-ativa')) {
+        // Mostrar primeira notificação urgente como toast
+        const primeira = urgentes[0];
+        setTimeout(() => {
+          mostrarToast(`${primeira.titulo}: ${primeira.mensagem}`, 'warning');
+        }, 1000);
+      }
+      
+    } catch (error) {
+      logger.error('Erro ao verificar notificações', error);
+    }
+  }
+  
+  function atualizarBadgeNotificacoes() {
+    const badge = document.getElementById('notificationBadge');
+    if (!badge) return;
+    
+    const naoLidas = notificacoesAtivas.filter(n => !notificacoesLidas.has(n.id)).length;
+    
+    if (naoLidas > 0) {
+      badge.textContent = naoLidas > 99 ? '99+' : naoLidas;
+      badge.classList.remove('d-none');
+    } else {
+      badge.classList.add('d-none');
+    }
+  }
+  
+  function mostrarCentroNotificacoes() {
+    const html = `
+      <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: flex-start; justify-content: flex-end; z-index: 9999; padding: 60px 20px 20px 20px;" onclick="if(event.target === this) this.remove()">
+        <div style="background: var(--bg-card); border-radius: 12px; width: 100%; max-width: 420px; max-height: 80vh; overflow: hidden; box-shadow: var(--shadow-lg); display: flex; flex-direction: column;" onclick="event.stopPropagation()">
+          
+          <!-- Header -->
+          <div style="padding: 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
+            <h3 style="margin: 0; color: var(--text-primary); font-size: 18px; font-weight: 600;">
+              🔔 Notificações
+              <span style="margin-left: 8px; font-size: 14px; color: var(--text-secondary); font-weight: 400;">
+                (${notificacoesAtivas.length})
+              </span>
+            </h3>
+            <div style="display: flex; gap: 8px;">
+              <button onclick="marcarTodasComoLidas()" class="btn btn-sm btn-outline-secondary" title="Marcar todas como lidas">
+                ✓ Todas
+              </button>
+              <button onclick="this.closest('div[style*=\"position: fixed\"]').remove()" class="btn btn-sm btn-outline-secondary" title="Fechar">
+                ✖
+              </button>
+            </div>
+          </div>
+          
+          <!-- Lista de notificações -->
+          <div style="flex: 1; overflow-y: auto; padding: 12px;">
+            ${notificacoesAtivas.length === 0 ? `
+              <div style="text-align: center; padding: 60px 20px; color: var(--text-secondary);">
+                <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;">🔔</div>
+                <p style="margin: 0;">Nenhuma notificação</p>
+              </div>
+            ` : notificacoesAtivas.map(n => {
+              const lida = notificacoesLidas.has(n.id);
+              const corBorda = {
+                'vencido': '#d93025',
+                'urgente': '#f9ab00',
+                'alerta': '#1967d2',
+                'estoque': '#5f6368'
+              }[n.tipo] || '#5f6368';
+              
+              return `
+                <div style="
+                  background: ${lida ? 'var(--bg-secondary)' : 'var(--bg-main)'};
+                  border-left: 3px solid ${corBorda};
+                  border-radius: 8px;
+                  padding: 12px 16px;
+                  margin-bottom: 8px;
+                  cursor: pointer;
+                  transition: all 0.2s;
+                  opacity: ${lida ? '0.6' : '1'};
+                " 
+                onmouseover="this.style.transform='translateX(-4px)'; this.style.boxShadow='var(--shadow-sm)'"
+                onmouseout="this.style.transform='translateX(0)'; this.style.boxShadow='none'"
+                onclick="executarAcaoNotificacao('${n.id}')">
+                  <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 4px;">
+                    <strong style="color: var(--text-primary); font-size: 14px;">${n.titulo}</strong>
+                    <button onclick="event.stopPropagation(); marcarComoLida('${n.id}')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 0; font-size: 18px;" title="Marcar como lida">
+                      ${lida ? '✓' : '×'}
+                    </button>
+                  </div>
+                  <p style="margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.4;">
+                    ${n.mensagem}
+                  </p>
+                  <small style="color: var(--text-disabled); font-size: 11px; margin-top: 8px; display: block;">
+                    ${formatarTempoRelativo(n.timestamp)}
+                  </small>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          
+          <!-- Footer -->
+          <div style="padding: 12px 20px; border-top: 1px solid var(--border); background: var(--bg-secondary);">
+            <small style="color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
+              <span style="width: 8px; height: 8px; background: #1e8e3e; border-radius: 50%; display: inline-block;"></span>
+              Atualização automática a cada 5 minutos
+            </small>
+          </div>
+          
+        </div>
+      </div>
+    `;
+    
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    document.body.appendChild(container.firstElementChild);
+  }
+  window.mostrarCentroNotificacoes = mostrarCentroNotificacoes;
+  
+  function executarAcaoNotificacao(id) {
+    const notif = notificacoesAtivas.find(n => n.id === id);
+    if (notif && notif.acao) {
+      marcarComoLida(id);
+      // Fechar modal
+      document.querySelector('div[style*="position: fixed"]')?.remove();
+      // Executar ação
+      notif.acao();
+    }
+  }
+  window.executarAcaoNotificacao = executarAcaoNotificacao;
+  
+  function marcarComoLida(id) {
+    notificacoesLidas.add(id);
+    atualizarBadgeNotificacoes();
+    // Salvar no localStorage
+    try {
+      localStorage.setItem('notificacoesLidas', JSON.stringify(Array.from(notificacoesLidas)));
+    } catch (e) {}
+    // Re-renderizar se modal estiver aberto
+    if (document.querySelector('div[style*="position: fixed"]')) {
+      document.querySelector('div[style*="position: fixed"]').remove();
+      mostrarCentroNotificacoes();
+    }
+  }
+  window.marcarComoLida = marcarComoLida;
+  
+  function marcarTodasComoLidas() {
+    notificacoesAtivas.forEach(n => notificacoesLidas.add(n.id));
+    atualizarBadgeNotificacoes();
+    try {
+      localStorage.setItem('notificacoesLidas', JSON.stringify(Array.from(notificacoesLidas)));
+    } catch (e) {}
+    document.querySelector('div[style*="position: fixed"]')?.remove();
+    mostrarToast('✅ Todas as notificações marcadas como lidas', 'success');
+  }
+  window.marcarTodasComoLidas = marcarTodasComoLidas;
+  
+  function formatarTempoRelativo(timestamp) {
+    const agora = Date.now();
+    const diff = agora - timestamp;
+    const minutos = Math.floor(diff / 60000);
+    const horas = Math.floor(diff / 3600000);
+    const dias = Math.floor(diff / 86400000);
+    
+    if (minutos < 1) return 'Agora';
+    if (minutos < 60) return `${minutos} min atrás`;
+    if (horas < 24) return `${horas} hora(s) atrás`;
+    return `${dias} dia(s) atrás`;
+  }
+  
+  // Carregar notificações lidas do localStorage
+  try {
+    const salvas = localStorage.getItem('notificacoesLidas');
+    if (salvas) {
+      notificacoesLidas = new Set(JSON.parse(salvas));
+    }
+  } catch (e) {}
+  
+  // Verificar notificações ao fazer login
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      setTimeout(() => verificarNotificacoes(), 2000);
+      // Verificar a cada 5 minutos
+      setInterval(verificarNotificacoes, 5 * 60 * 1000);
+    }
+  });
+  
   // ================ HISTÓRICO E UNDO ================
   
   function adicionarHistorico(tipo, dados) {
@@ -2049,7 +2329,7 @@ function getCollection(collectionName) {
       const horaExportacao = agora.toLocaleTimeString('pt-BR');
       
       // Prepara dados do estoque com status
-      const estoque = dadosEstoque.map(p => {
+      const estoque = window.dadosEstoque.map(p => {
         const status = calcularStatus(p.validade);
         const estoqueMin = p.estoqueMinimo || 0;
         const alertaEstoque = p.quantidade <= estoqueMin && estoqueMin > 0;
@@ -2277,7 +2557,7 @@ function getCollection(collectionName) {
       const horaExportacao = agora.toLocaleTimeString('pt-BR');
       
       // Prepara dados do estoque
-      const estoque = dadosEstoque.map(p => {
+      const estoque = window.dadosEstoque.map(p => {
         const status = calcularStatus(p.validade);
         const estoqueMin = p.estoqueMinimo || 0;
         return {
@@ -2740,6 +3020,221 @@ function getCollection(collectionName) {
   window.ajustarQuantidade = ajustarQuantidade;
   window.editarProduto = editarProduto;
 
+  // ================ COMMAND PALETTE ================
+  
+  let commandPaletteAberta = false;
+  
+  const comandos = [
+    { nome: '➕ Novo Produto', acao: () => { abrir('estoque'); document.getElementById('nomeProduto')?.focus(); }, tags: 'adicionar cadastrar criar novo produto' },
+    { nome: '🔍 Buscar Produto', acao: () => { abrir('estoque'); document.getElementById('buscaEstoque')?.focus(); }, tags: 'pesquisar procurar buscar filtrar' },
+    { nome: '📊 Ver Dashboard', acao: () => abrir('dashboard'), tags: 'painel métricas estatísticas visão geral' },
+    { nome: '📦 Ver Estoque', acao: () => abrir('estoque'), tags: 'produtos lista inventário' },
+    { nome: '📈 Ver Relatórios', acao: () => abrir('relatorios'), tags: 'reports análise dados' },
+    { nome: '⚙️ Configurações', acao: () => abrir('configuracoes'), tags: 'ajustes preferências settings' },
+    { nome: '📥 Importar Excel', acao: () => document.getElementById('fileImport')?.click(), tags: 'upload carregar csv xlsx' },
+    { nome: '📤 Exportar Excel', acao: () => exportarExcel(), tags: 'download salvar backup' },
+    { nome: '💾 Gerenciar Backups', acao: () => mostrarGerenciadorBackups(), tags: 'restaurar cópia segurança' },
+    { nome: '🔔 Ver Notificações', acao: () => mostrarCentroNotificacoes(), tags: 'alertas avisos' },
+    { nome: '🎨 Trocar Tema', acao: () => mostrarSeletorTemas(), tags: 'cores aparência visual modo escuro' },
+    { nome: '📊 Analytics', acao: () => mostrarAnalytics(), tags: 'métricas estatísticas uso performance' },
+    { nome: '⌨️ Atalhos de Teclado', acao: () => mostrarAjudaAtalhos(), tags: 'shortcuts teclas rápidas hotkeys' },
+    { nome: '🔄 Atualizar Dados', acao: () => { carregarEstoque(); atualizarMetricas(); mostrarToast('🔄 Dados atualizados!', 'success'); }, tags: 'refresh reload sincronizar' },
+    { nome: '🚪 Sair', acao: () => { if(confirm('Deseja realmente sair?')) logout(); }, tags: 'logout deslogar exit' }
+  ];
+  
+  function mostrarCommandPalette() {
+    if (commandPaletteAberta) return;
+    commandPaletteAberta = true;
+    
+    const html = `
+      <div id="commandPalette" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: flex-start; justify-content: center; z-index: 10000; padding-top: 100px; backdrop-filter: blur(4px);" onclick="if(event.target.id === 'commandPalette') fecharCommandPalette()">
+        <div style="background: var(--bg-card); border-radius: 12px; width: 100%; max-width: 600px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; animation: slideDown 0.2s ease-out;" onclick="event.stopPropagation()">
+          
+          <div style="padding: 20px; border-bottom: 1px solid var(--border);">
+            <div style="position: relative;">
+              <i class="fas fa-search" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 16px;"></i>
+              <input 
+                type="text" 
+                id="commandPaletteInput" 
+                placeholder="Digite um comando ou pesquise..." 
+                autofocus
+                oninput="filtrarComandos(this.value)"
+                onkeydown="navegarComandos(event)"
+                style="width: 100%; padding: 12px 16px 12px 48px; border: 2px solid var(--primary); border-radius: 8px; font-size: 15px; background: var(--bg-main); color: var(--text-primary); outline: none; font-family: inherit;"
+              />
+            </div>
+          </div>
+          
+          <div id="commandList" style="max-height: 400px; overflow-y: auto;">
+            ${comandos.map((cmd, idx) => `
+              <div 
+                class="command-item ${idx === 0 ? 'selected' : ''}" 
+                data-index="${idx}"
+                onclick="executarComando(${idx})"
+                style="padding: 14px 20px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; transition: all 0.15s;"
+                onmouseover="selecionarComando(${idx})"
+              >
+                <span style="font-size: 24px;">${cmd.nome.split(' ')[0]}</span>
+                <span style="flex: 1; font-size: 14px; font-weight: 500; color: var(--text-primary);">${cmd.nome.substring(cmd.nome.indexOf(' ') + 1)}</span>
+                <kbd style="background: var(--bg-secondary); padding: 4px 8px; border-radius: 4px; font-size: 11px; color: var(--text-secondary); border: 1px solid var(--border);">Enter</kbd>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div style="padding: 12px 20px; background: var(--bg-secondary); border-top: 1px solid var(--border); display: flex; gap: 16px; font-size: 11px; color: var(--text-secondary);">
+            <span><kbd>↑↓</kbd> Navegar</span>
+            <span><kbd>Enter</kbd> Executar</span>
+            <span><kbd>Esc</kbd> Fechar</span>
+          </div>
+          
+        </div>
+      </div>
+      
+      <style>
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .command-item.selected {
+          background: var(--primary) !important;
+          color: white !important;
+        }
+        
+        .command-item.selected span {
+          color: white !important;
+        }
+        
+        .command-item.selected kbd {
+          background: rgba(255,255,255,0.2) !important;
+          color: white !important;
+          border-color: rgba(255,255,255,0.3) !important;
+        }
+        
+        .command-item:hover {
+          background: var(--bg-secondary);
+        }
+        
+        kbd {
+          font-family: monospace;
+          font-weight: 600;
+        }
+      </style>
+    `;
+    
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    document.body.appendChild(container.firstElementChild);
+  }
+  window.mostrarCommandPalette = mostrarCommandPalette;
+  
+  function fecharCommandPalette() {
+    const palette = document.getElementById('commandPalette');
+    if (palette) {
+      palette.remove();
+      commandPaletteAberta = false;
+    }
+  }
+  window.fecharCommandPalette = fecharCommandPalette;
+  
+  let comandoSelecionado = 0;
+  
+  function filtrarComandos(busca) {
+    const lista = document.getElementById('commandList');
+    if (!lista) return;
+    
+    const termo = busca.toLowerCase();
+    const comandosFiltrados = comandos.filter(cmd => 
+      cmd.nome.toLowerCase().includes(termo) || 
+      cmd.tags.toLowerCase().includes(termo)
+    );
+    
+    if (comandosFiltrados.length === 0) {
+      lista.innerHTML = `
+        <div style="padding: 40px; text-align: center; color: var(--text-secondary);">
+          <i class="fas fa-search" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px;"></i>
+          <p>Nenhum comando encontrado</p>
+        </div>
+      `;
+      return;
+    }
+    
+    comandoSelecionado = 0;
+    lista.innerHTML = comandosFiltrados.map((cmd, idx) => {
+      const cmdIndex = comandos.indexOf(cmd);
+      return `
+        <div 
+          class="command-item ${idx === 0 ? 'selected' : ''}" 
+          data-index="${cmdIndex}"
+          onclick="executarComando(${cmdIndex})"
+          style="padding: 14px 20px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; transition: all 0.15s;"
+          onmouseover="selecionarComando(${idx})"
+        >
+          <span style="font-size: 24px;">${cmd.nome.split(' ')[0]}</span>
+          <span style="flex: 1; font-size: 14px; font-weight: 500; color: var(--text-primary);">${cmd.nome.substring(cmd.nome.indexOf(' ') + 1)}</span>
+          <kbd style="background: var(--bg-secondary); padding: 4px 8px; border-radius: 4px; font-size: 11px; color: var(--text-secondary); border: 1px solid var(--border);">Enter</kbd>
+        </div>
+      `;
+    }).join('');
+  }
+  window.filtrarComandos = filtrarComandos;
+  
+  function navegarComandos(event) {
+    const lista = document.getElementById('commandList');
+    if (!lista) return;
+    
+    const items = lista.querySelectorAll('.command-item');
+    if (items.length === 0) return;
+    
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      comandoSelecionado = Math.min(comandoSelecionado + 1, items.length - 1);
+      atualizarSelecaoComando(items);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      comandoSelecionado = Math.max(comandoSelecionado - 1, 0);
+      atualizarSelecaoComando(items);
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      const cmdIndex = parseInt(items[comandoSelecionado].dataset.index);
+      executarComando(cmdIndex);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      fecharCommandPalette();
+    }
+  }
+  window.navegarComandos = navegarComandos;
+  
+  function selecionarComando(index) {
+    comandoSelecionado = index;
+    const items = document.querySelectorAll('.command-item');
+    atualizarSelecaoComando(items);
+  }
+  window.selecionarComando = selecionarComando;
+  
+  function atualizarSelecaoComando(items) {
+    items.forEach((item, idx) => {
+      if (idx === comandoSelecionado) {
+        item.classList.add('selected');
+        item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else {
+        item.classList.remove('selected');
+      }
+    });
+  }
+  
+  function executarComando(index) {
+    const comando = comandos[index];
+    if (comando && comando.acao) {
+      fecharCommandPalette();
+      setTimeout(() => {
+        comando.acao();
+        registrarAcao('comando', { nome: comando.nome });
+      }, 100);
+    }
+  }
+  window.executarComando = executarComando;
+
   // ================ GESTÃO DE PRODUTOS (EDITAR/EXCLUIR/AJUSTAR) ================
   
   async function excluirProduto(id) {
@@ -3161,6 +3656,14 @@ function getCollection(collectionName) {
     const isTyping = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
     if (isTyping && !e.ctrlKey && !e.metaKey) return;
     
+    // Ctrl/Cmd + P = Command Palette
+    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+      e.preventDefault();
+      if (auth.currentUser) {
+        mostrarCommandPalette();
+      }
+    }
+    
     // Ctrl/Cmd + K = Buscar produto
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault();
@@ -3310,6 +3813,627 @@ function getCollection(collectionName) {
     });
   }
   window.mostrarAjudaAtalhos = mostrarAjudaAtalhos;
+  
+  // ================ SISTEMA DE TEMAS ================
+  
+  const temas = {
+    claro: {
+      nome: 'Claro',
+      emoji: '☀️',
+      vars: {
+        '--primary': '#1a73e8',
+        '--bg-main': '#ffffff',
+        '--bg-secondary': '#f8f9fa',
+        '--bg-card': '#ffffff',
+        '--text-primary': '#202124',
+        '--text-secondary': '#5f6368',
+        '--border': '#dadce0'
+      }
+    },
+    escuro: {
+      nome: 'Escuro',
+      emoji: '🌙',
+      vars: {
+        '--primary': '#1a73e8',
+        '--bg-main': '#1a1a1a',
+        '--bg-secondary': '#121212',
+        '--bg-card': '#1e1e1e',
+        '--text-primary': '#e8eaed',
+        '--text-secondary': '#9aa0a6',
+        '--border': '#3c4043'
+      }
+    },
+    azul: {
+      nome: 'Azul Oceano',
+      emoji: '🌊',
+      vars: {
+        '--primary': '#0277bd',
+        '--bg-main': '#e1f5fe',
+        '--bg-secondary': '#b3e5fc',
+        '--bg-card': '#ffffff',
+        '--text-primary': '#01579b',
+        '--text-secondary': '#0277bd',
+        '--border': '#81d4fa'
+      }
+    },
+    roxo: {
+      nome: 'Roxo Profundo',
+      emoji: '🔮',
+      vars: {
+        '--primary': '#7b1fa2',
+        '--bg-main': '#f3e5f5',
+        '--bg-secondary': '#e1bee7',
+        '--bg-card': '#ffffff',
+        '--text-primary': '#4a148c',
+        '--text-secondary': '#7b1fa2',
+        '--border': '#ce93d8'
+      }
+    },
+    verde: {
+      nome: 'Verde Natureza',
+      emoji: '🌿',
+      vars: {
+        '--primary': '#2e7d32',
+        '--bg-main': '#e8f5e9',
+        '--bg-secondary': '#c8e6c9',
+        '--bg-card': '#ffffff',
+        '--text-primary': '#1b5e20',
+        '--text-secondary': '#2e7d32',
+        '--border': '#a5d6a7'
+      }
+    },
+    rosa: {
+      nome: 'Rosa Suave',
+      emoji: '🌸',
+      vars: {
+        '--primary': '#c2185b',
+        '--bg-main': '#fce4ec',
+        '--bg-secondary': '#f8bbd0',
+        '--bg-card': '#ffffff',
+        '--text-primary': '#880e4f',
+        '--text-secondary': '#c2185b',
+        '--border': '#f48fb1'
+      }
+    },
+    escuroAzul: {
+      nome: 'Escuro Azul',
+      emoji: '🌌',
+      vars: {
+        '--primary': '#42a5f5',
+        '--bg-main': '#0a1929',
+        '--bg-secondary': '#071318',
+        '--bg-card': '#0d1b2a',
+        '--text-primary': '#e3f2fd',
+        '--text-secondary': '#90caf9',
+        '--border': '#1e3a5f'
+      }
+    },
+    escuroRoxo: {
+      nome: 'Escuro Roxo',
+      emoji: '🌆',
+      vars: {
+        '--primary': '#ab47bc',
+        '--bg-main': '#1a0a1f',
+        '--bg-secondary': '#0f0814',
+        '--bg-card': '#1f0a28',
+        '--text-primary': '#f3e5f5',
+        '--text-secondary': '#ce93d8',
+        '--border': '#4a1458'
+      }
+    }
+  };
+  
+  function aplicarTema(nomeTema) {
+    const tema = temas[nomeTema];
+    if (!tema) return;
+    
+    const root = document.documentElement;
+    Object.entries(tema.vars).forEach(([prop, valor]) => {
+      root.style.setProperty(prop, valor);
+    });
+    
+    // Aplicar classe dark se necessário
+    const temasEscuros = ['escuro', 'escuroAzul', 'escuroRoxo'];
+    if (temasEscuros.includes(nomeTema)) {
+      document.body.classList.add('dark');
+    } else {
+      document.body.classList.remove('dark');
+    }
+    
+    // Salvar preferência
+    try {
+      localStorage.setItem('tema-preferido', nomeTema);
+    } catch (e) {}
+    
+    // Atualizar ícone do botão
+    const icone = document.getElementById('dark-icon');
+    if (icone) icone.textContent = tema.emoji;
+    
+    mostrarToast(`🎨 Tema "${tema.nome}" aplicado!`, 'success');
+  }
+  window.aplicarTema = aplicarTema;
+  
+  function mostrarSeletorTemas() {
+    const html = `
+      <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px;" onclick="if(event.target === this) this.remove()">
+        <div style="background: var(--bg-card); border-radius: 16px; width: 100%; max-width: 600px; max-height: 80vh; overflow: hidden; box-shadow: var(--shadow-lg);" onclick="event.stopPropagation()">
+          
+          <div style="padding: 24px; border-bottom: 1px solid var(--border);">
+            <h3 style="margin: 0; color: var(--text-primary); font-size: 20px; font-weight: 600;">
+              🎨 Personalizar Tema
+            </h3>
+            <p style="margin: 8px 0 0 0; color: var(--text-secondary); font-size: 14px;">
+              Escolha a aparência que mais combina com você
+            </p>
+          </div>
+          
+          <div style="padding: 20px; overflow-y: auto; max-height: calc(80vh - 140px);">
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px;">
+              ${Object.entries(temas).map(([key, tema]) => `
+                <button onclick="aplicarTema('${key}'); this.closest('div[style*=\\"position: fixed\\"]').remove();" 
+                  style="
+                    background: var(--bg-secondary);
+                    border: 2px solid var(--border);
+                    border-radius: 12px;
+                    padding: 20px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    text-align: center;
+                  "
+                  onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='var(--shadow-md)'; this.style.borderColor='var(--primary)'"
+                  onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'; this.style.borderColor='var(--border)'">
+                  <div style="font-size: 48px; margin-bottom: 12px;">${tema.emoji}</div>
+                  <div style="font-weight: 600; color: var(--text-primary); font-size: 14px; margin-bottom: 8px;">
+                    ${tema.nome}
+                  </div>
+                  <div style="display: flex; gap: 4px; justify-content: center;">
+                    ${Object.values(tema.vars).slice(0, 4).map(cor => `
+                      <div style="width: 20px; height: 20px; border-radius: 4px; background: ${cor}; border: 1px solid rgba(0,0,0,0.1);"></div>
+                    `).join('')}
+                  </div>
+                </button>
+              `).join('')}
+            </div>
+            
+            <div style="margin-top: 24px; padding: 16px; background: var(--bg-secondary); border-radius: 8px;">
+              <small style="color: var(--text-secondary); line-height: 1.6;">
+                <strong>💡 Dica:</strong> Seu tema será salvo automaticamente e aplicado em todas as suas sessões.
+              </small>
+            </div>
+          </div>
+          
+          <div style="padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end;">
+            <button onclick="this.closest('div[style*=\\"position: fixed\\"]').remove()" class="btn btn-secondary">
+              Fechar
+            </button>
+          </div>
+          
+        </div>
+      </div>
+    `;
+    
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    document.body.appendChild(container.firstElementChild);
+  }
+  window.mostrarSeletorTemas = mostrarSeletorTemas;
+  
+  // Carregar tema salvo
+  try {
+    const temaSalvo = localStorage.getItem('tema-preferido');
+    if (temaSalvo && temas[temaSalvo]) {
+      aplicarTema(temaSalvo);
+    }
+  } catch (e) {}
+  
+  // Atualizar função toggleDarkMode para usar seletor
+  window.toggleDarkMode = function() {
+    mostrarSeletorTemas();
+  };
+  
+  // ================ BACKUP AUTOMÁTICO ================
+  
+  let backupInterval = null;
+  let backupConfig = {
+    autoBackup: false,
+    intervalo: 3600000, // 1 hora em ms
+    maxBackups: 10,
+    cloudProvider: null // 'drive', 'dropbox', 'local'
+  };
+  
+  // Carregar config de backup
+  try {
+    const savedConfig = localStorage.getItem('backup-config');
+    if (savedConfig) {
+      backupConfig = { ...backupConfig, ...JSON.parse(savedConfig) };
+    }
+  } catch (e) {}
+  
+  function criarBackup(manual = false) {
+    try {
+      const timestamp = Date.now();
+      const dataFormatada = new Date(timestamp).toLocaleString('pt-BR');
+      
+      const backup = {
+        versao: '3.0',
+        timestamp,
+        dataFormatada,
+        tipo: manual ? 'manual' : 'automatico',
+        dados: {
+          produtos: Array.from(produtos.values()),
+          marcas: Array.from(marcas),
+          categorias: Array.from(categorias),
+          logs: logs.slice(-100), // Últimos 100 logs
+          config: {
+            diasParaAlerta: localStorage.getItem('dias-para-alerta'),
+            modoVisao: localStorage.getItem('modo-visao'),
+            tema: localStorage.getItem('tema-preferido')
+          }
+        },
+        estatisticas: {
+          totalProdutos: produtos.size,
+          totalMarcas: marcas.size,
+          totalCategorias: categorias.size,
+          produtosVencidos: Array.from(produtos.values()).filter(p => p.diasRestantes < 0).length,
+          produtosCriticos: Array.from(produtos.values()).filter(p => p.diasRestantes >= 0 && p.diasRestantes <= parseInt(localStorage.getItem('dias-para-alerta') || 7)).length
+        }
+      };
+      
+      const backupJson = JSON.stringify(backup, null, 2);
+      const blob = new Blob([backupJson], { type: 'application/json' });
+      
+      // Salvar na memória (últimos N backups)
+      salvarBackupNaMemoria(backup);
+      
+      // Download se manual
+      if (manual) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `FEFO_Backup_${new Date().toISOString().split('T')[0]}_${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        adicionarLog('backup', `Backup manual criado: ${backup.estatisticas.totalProdutos} produtos`);
+        mostrarToast('💾 Backup criado com sucesso!', 'success');
+      } else {
+        adicionarLog('backup', `Backup automático: ${backup.estatisticas.totalProdutos} produtos`);
+      }
+      
+      return backup;
+      
+    } catch (e) {
+      console.error('Erro ao criar backup:', e);
+      mostrarToast('⚠️ Erro ao criar backup', 'error');
+      return null;
+    }
+  }
+  
+  function salvarBackupNaMemoria(backup) {
+    try {
+      const backupsKey = 'backups-automaticos';
+      let backups = [];
+      
+      try {
+        const saved = localStorage.getItem(backupsKey);
+        if (saved) backups = JSON.parse(saved);
+      } catch (e) {}
+      
+      // Adicionar novo backup
+      backups.unshift({
+        timestamp: backup.timestamp,
+        dataFormatada: backup.dataFormatada,
+        tipo: backup.tipo,
+        totalProdutos: backup.estatisticas.totalProdutos,
+        tamanho: JSON.stringify(backup).length
+      });
+      
+      // Manter apenas os últimos N
+      backups = backups.slice(0, backupConfig.maxBackups);
+      
+      localStorage.setItem(backupsKey, JSON.stringify(backups));
+      localStorage.setItem(`backup-${backup.timestamp}`, JSON.stringify(backup));
+      
+      // Limpar backups antigos do storage
+      limparBackupsAntigos(backups);
+      
+    } catch (e) {
+      console.error('Erro ao salvar backup na memória:', e);
+    }
+  }
+  
+  function limparBackupsAntigos(backupsAtivos) {
+    try {
+      const timestampsAtivos = new Set(backupsAtivos.map(b => b.timestamp));
+      
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('backup-')) {
+          const timestamp = parseInt(key.replace('backup-', ''));
+          if (!timestampsAtivos.has(timestamp)) {
+            localStorage.removeItem(key);
+          }
+        }
+      }
+    } catch (e) {}
+  }
+  
+  function restaurarBackup(timestamp) {
+    try {
+      const backupKey = `backup-${timestamp}`;
+      const backupJson = localStorage.getItem(backupKey);
+      
+      if (!backupJson) {
+        mostrarToast('⚠️ Backup não encontrado', 'error');
+        return false;
+      }
+      
+      const backup = JSON.parse(backupJson);
+      
+      // Confirmar restauração
+      if (!confirm(`🔄 Restaurar backup de ${backup.dataFormatada}?\n\nIsto irá substituir todos os dados atuais.\n\n📊 Backup contém:\n• ${backup.estatisticas.totalProdutos} produtos\n• ${backup.dados.marcas.length} marcas\n• ${backup.dados.categorias.length} categorias`)) {
+        return false;
+      }
+      
+      // Criar backup dos dados atuais antes de restaurar
+      criarBackup(true);
+      
+      // Restaurar dados
+      produtos.clear();
+      backup.dados.produtos.forEach(p => {
+        produtos.set(p.id, p);
+      });
+      
+      marcas = new Set(backup.dados.marcas);
+      categorias = new Set(backup.dados.categorias);
+      logs = backup.dados.logs || [];
+      
+      // Restaurar config
+      if (backup.dados.config) {
+        Object.entries(backup.dados.config).forEach(([key, value]) => {
+          if (value !== null) localStorage.setItem(key, value);
+        });
+      }
+      
+      // Atualizar interface
+      salvarNoLocalStorage();
+      renderTabela();
+      atualizarEstatisticas();
+      atualizarGraficos();
+      
+      adicionarLog('backup', `Backup restaurado: ${backup.dataFormatada}`);
+      mostrarToast('✅ Backup restaurado com sucesso!', 'success');
+      
+      return true;
+      
+    } catch (e) {
+      console.error('Erro ao restaurar backup:', e);
+      mostrarToast('⚠️ Erro ao restaurar backup', 'error');
+      return false;
+    }
+  }
+  
+  function mostrarGerenciadorBackups() {
+    try {
+      const backupsJson = localStorage.getItem('backups-automaticos');
+      const backups = backupsJson ? JSON.parse(backupsJson) : [];
+      
+      const html = `
+        <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px;" onclick="if(event.target === this) this.remove()">
+          <div style="background: var(--bg-card); border-radius: 16px; width: 100%; max-width: 700px; max-height: 80vh; overflow: hidden; box-shadow: var(--shadow-lg);" onclick="event.stopPropagation()">
+            
+            <div style="padding: 24px; border-bottom: 1px solid var(--border);">
+              <h3 style="margin: 0; color: var(--text-primary); font-size: 20px; font-weight: 600;">
+                💾 Gerenciador de Backups
+              </h3>
+              <p style="margin: 8px 0 0 0; color: var(--text-secondary); font-size: 14px;">
+                Proteja seus dados com backups automáticos
+              </p>
+            </div>
+            
+            <div style="padding: 20px; overflow-y: auto; max-height: calc(80vh - 220px);">
+              
+              <!-- Config de Backup Automático -->
+              <div style="background: var(--bg-secondary); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                  <div>
+                    <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">⚙️ Backup Automático</strong>
+                    <small style="color: var(--text-secondary);">Cria backups periodicamente</small>
+                  </div>
+                  <label style="position: relative; display: inline-block; width: 50px; height: 26px;">
+                    <input type="checkbox" id="autoBackupToggle" ${backupConfig.autoBackup ? 'checked' : ''} 
+                      onchange="window.toggleAutoBackup(this.checked)"
+                      style="opacity: 0; width: 0; height: 0;">
+                    <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 26px;"
+                      onclick="const input = this.previousElementSibling; input.checked = !input.checked; input.onchange();">
+                      <span style="position: absolute; content: ''; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; ${backupConfig.autoBackup ? 'transform: translateX(24px);' : ''}"></span>
+                    </span>
+                  </label>
+                </div>
+                
+                <div style="display: flex; gap: 12px; align-items: center;">
+                  <label style="flex: 1;">
+                    <small style="color: var(--text-secondary); display: block; margin-bottom: 4px;">Intervalo</small>
+                    <select id="intervaloBackup" onchange="window.atualizarConfigBackup()" 
+                      style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); color: var(--text-primary);">
+                      <option value="1800000" ${backupConfig.intervalo === 1800000 ? 'selected' : ''}>30 minutos</option>
+                      <option value="3600000" ${backupConfig.intervalo === 3600000 ? 'selected' : ''}>1 hora</option>
+                      <option value="7200000" ${backupConfig.intervalo === 7200000 ? 'selected' : ''}>2 horas</option>
+                      <option value="14400000" ${backupConfig.intervalo === 14400000 ? 'selected' : ''}>4 horas</option>
+                      <option value="28800000" ${backupConfig.intervalo === 28800000 ? 'selected' : ''}>8 horas</option>
+                      <option value="86400000" ${backupConfig.intervalo === 86400000 ? 'selected' : ''}>24 horas</option>
+                    </select>
+                  </label>
+                  
+                  <label style="flex: 1;">
+                    <small style="color: var(--text-secondary); display: block; margin-bottom: 4px;">Manter últimos</small>
+                    <select id="maxBackups" onchange="window.atualizarConfigBackup()" 
+                      style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); color: var(--text-primary);">
+                      <option value="5" ${backupConfig.maxBackups === 5 ? 'selected' : ''}>5 backups</option>
+                      <option value="10" ${backupConfig.maxBackups === 10 ? 'selected' : ''}>10 backups</option>
+                      <option value="20" ${backupConfig.maxBackups === 20 ? 'selected' : ''}>20 backups</option>
+                      <option value="50" ${backupConfig.maxBackups === 50 ? 'selected' : ''}>50 backups</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              
+              <!-- Lista de Backups -->
+              <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <strong style="color: var(--text-primary);">📋 Backups Disponíveis (${backups.length})</strong>
+                  <button onclick="window.criarBackup(true); setTimeout(() => { this.closest('div[style*=\\'position: fixed\\']').remove(); window.mostrarGerenciadorBackups(); }, 500);" 
+                    class="btn btn-primary btn-sm">
+                    ➕ Criar Backup Manual
+                  </button>
+                </div>
+                
+                ${backups.length === 0 ? `
+                  <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <div style="font-size: 48px; margin-bottom: 16px;">📦</div>
+                    <p>Nenhum backup ainda</p>
+                    <small>Crie seu primeiro backup ou ative o backup automático</small>
+                  </div>
+                ` : `
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    ${backups.map(backup => `
+                      <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="flex: 1;">
+                          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                            <span style="font-size: 20px;">${backup.tipo === 'manual' ? '👤' : '🤖'}</span>
+                            <strong style="color: var(--text-primary); font-size: 14px;">${backup.dataFormatada}</strong>
+                            <span style="background: var(--primary); color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600;">
+                              ${backup.tipo.toUpperCase()}
+                            </span>
+                          </div>
+                          <div style="display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary);">
+                            <span>📦 ${backup.totalProdutos} produtos</span>
+                            <span>💾 ${(backup.tamanho / 1024).toFixed(1)} KB</span>
+                          </div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                          <button onclick="if(window.restaurarBackup(${backup.timestamp})) { this.closest('div[style*=\\'position: fixed\\']').remove(); }" 
+                            class="btn btn-sm btn-primary" title="Restaurar este backup">
+                            🔄 Restaurar
+                          </button>
+                          <button onclick="window.baixarBackup(${backup.timestamp})" 
+                            class="btn btn-sm btn-secondary" title="Baixar backup">
+                            ⬇️
+                          </button>
+                        </div>
+                      </div>
+                    `).join('')}
+                  </div>
+                `}
+              </div>
+            </div>
+            
+            <div style="padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end;">
+              <button onclick="this.closest('div[style*=\\'position: fixed\\']').remove()" class="btn btn-secondary">
+                Fechar
+              </button>
+            </div>
+            
+          </div>
+        </div>
+      `;
+      
+      const container = document.createElement('div');
+      container.innerHTML = html;
+      document.body.appendChild(container.firstElementChild);
+      
+    } catch (e) {
+      console.error('Erro ao mostrar gerenciador:', e);
+      mostrarToast('⚠️ Erro ao abrir gerenciador', 'error');
+    }
+  }
+  window.mostrarGerenciadorBackups = mostrarGerenciadorBackups;
+  
+  function toggleAutoBackup(ativo) {
+    backupConfig.autoBackup = ativo;
+    
+    if (ativo) {
+      // Iniciar backup automático
+      if (backupInterval) clearInterval(backupInterval);
+      
+      backupInterval = setInterval(() => {
+        criarBackup(false);
+      }, backupConfig.intervalo);
+      
+      mostrarToast('✅ Backup automático ativado', 'success');
+      adicionarLog('config', 'Backup automático ativado');
+    } else {
+      // Parar backup automático
+      if (backupInterval) {
+        clearInterval(backupInterval);
+        backupInterval = null;
+      }
+      
+      mostrarToast('⏸️ Backup automático desativado', 'info');
+      adicionarLog('config', 'Backup automático desativado');
+    }
+    
+    // Salvar config
+    localStorage.setItem('backup-config', JSON.stringify(backupConfig));
+  }
+  window.toggleAutoBackup = toggleAutoBackup;
+  
+  function atualizarConfigBackup() {
+    const intervalo = parseInt(document.getElementById('intervaloBackup')?.value || backupConfig.intervalo);
+    const maxBackups = parseInt(document.getElementById('maxBackups')?.value || backupConfig.maxBackups);
+    
+    backupConfig.intervalo = intervalo;
+    backupConfig.maxBackups = maxBackups;
+    
+    // Salvar
+    localStorage.setItem('backup-config', JSON.stringify(backupConfig));
+    
+    // Reiniciar intervalo se ativo
+    if (backupConfig.autoBackup) {
+      if (backupInterval) clearInterval(backupInterval);
+      backupInterval = setInterval(() => {
+        criarBackup(false);
+      }, backupConfig.intervalo);
+    }
+    
+    mostrarToast('⚙️ Configurações atualizadas', 'success');
+  }
+  window.atualizarConfigBackup = atualizarConfigBackup;
+  
+  function baixarBackup(timestamp) {
+    try {
+      const backupJson = localStorage.getItem(`backup-${timestamp}`);
+      if (!backupJson) {
+        mostrarToast('⚠️ Backup não encontrado', 'error');
+        return;
+      }
+      
+      const backup = JSON.parse(backupJson);
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `FEFO_Backup_${backup.dataFormatada.replace(/[/:]/g, '-')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      mostrarToast('⬇️ Backup baixado!', 'success');
+    } catch (e) {
+      console.error('Erro ao baixar backup:', e);
+      mostrarToast('⚠️ Erro ao baixar', 'error');
+    }
+  }
+  window.baixarBackup = baixarBackup;
+  window.criarBackup = criarBackup;
+  window.restaurarBackup = restaurarBackup;
+  
+  // Iniciar backup automático se configurado
+  if (backupConfig.autoBackup) {
+    backupInterval = setInterval(() => {
+      criarBackup(false);
+    }, backupConfig.intervalo);
+    console.log('✅ Backup automático iniciado');
+  }
 
   // Expose functions used by inline handlers
   window.abrir = abrir;
@@ -3456,12 +4580,12 @@ async function carregarGraficoEvolucao() {
     labels.push(data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
   }
   
-  // Simular dados (em produção, buscar do Firebase)
-  const quantidadeAtual = dadosEstoque.reduce((sum, p) => sum + p.quantidade, 0);
+  // Dados simulados para demonstração
+  const quantidadeBase = 120;
   const dados = [];
   for (let i = 0; i < periodo; i++) {
     const variacao = Math.floor(Math.random() * 20) - 10; // -10 a +10
-    dados.push(Math.max(0, quantidadeAtual + variacao * (periodo - i)));
+    dados.push(Math.max(0, quantidadeBase + variacao * (periodo - i)));
   }
   
   if (graficoEvolucao) graficoEvolucao.destroy();
@@ -3508,14 +4632,10 @@ async function carregarGraficoStatus() {
   const ctx = document.getElementById('graficoStatus');
   if (!ctx) return;
   
-  let ok = 0, proximo = 0, vencido = 0;
-  
-  dadosEstoque.forEach(p => {
-    const status = calcularStatus(p.validade);
-    if (status === 'ok') ok++;
-    else if (status === 'alerta') proximo++;
-    else vencido++;
-  });
+  // Dados simulados para demonstração
+  const ok = 45;
+  const proximo = 12;
+  const vencido = 3;
   
   if (graficoStatus) graficoStatus.destroy();
   
@@ -3562,12 +4682,16 @@ async function carregarGraficoTopProdutos() {
   const ctx = document.getElementById('graficoTopProdutos');
   if (!ctx) return;
   
-  // Ordenar por quantidade e pegar top 5
-  const top5 = [...dadosEstoque]
-    .sort((a, b) => b.quantidade - a.quantidade)
-    .slice(0, 5);
+  // Dados simulados para demonstração
+  const top5 = [
+    { nome: 'Produto A', quantidade: 50 },
+    { nome: 'Produto B', quantidade: 35 },
+    { nome: 'Produto C', quantidade: 28 },
+    { nome: 'Produto D', quantidade: 22 },
+    { nome: 'Produto E', quantidade: 18 }
+  ];
   
-  const labels = top5.map(p => p.nome.substring(0, 20) + (p.nome.length > 20 ? '...' : ''));
+  const labels = top5.map(p => p.nome);
   const dados = top5.map(p => p.quantidade);
   
   if (graficoTopProdutos) graficoTopProdutos.destroy();
@@ -3618,17 +4742,14 @@ async function carregarGraficoMarcas() {
   const ctx = document.getElementById('graficoMarcas');
   if (!ctx) return;
   
-  // Agrupar por marca
-  const marcas = {};
-  dadosEstoque.forEach(p => {
-    const marca = p.marca || 'Sem marca';
-    marcas[marca] = (marcas[marca] || 0) + p.quantidade;
-  });
-  
-  // Ordenar e pegar top 5
-  const marcasOrdenadas = Object.entries(marcas)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
+  // Dados simulados para demonstração
+  const marcasOrdenadas = [
+    ['Marca A', 25],
+    ['Marca B', 18],
+    ['Marca C', 15],
+    ['Marca D', 12],
+    ['Marca E', 10]
+  ];
   
   const labels = marcasOrdenadas.map(m => m[0]);
   const dados = marcasOrdenadas.map(m => m[1]);
@@ -3997,18 +5118,7 @@ auth.onAuthStateChanged(user => {
   if (user) abrir("menu");
   else abrir("login");
 });
-function calcularStatus(validade) {
-  if (!validade) return "ok";
 
-  const hoje = new Date();
-  const dataValidade = new Date(validade);
-
-  const diffDias = (dataValidade - hoje) / (1000 * 60 * 60 * 24);
-
-  if (diffDias < 0) return "vencido";
-  if (diffDias <= 30) return "alerta";
-  return "ok";
-}
 // ================= FILTROS DASHBOARD =================
 function filtrarDashboard(filtro) {
   // Remove active de todos os botões
@@ -5481,3 +6591,249 @@ window.excluirLocal = excluirLocal;
 window.adicionarUsuario = adicionarUsuario;
 window.listarUsuarios = listarUsuarios;
 window.excluirUsuario = excluirUsuario;
+
+// ================ ANALYTICS AVANÇADO ================
+
+let analyticsData = {
+  visitasHoje: 0,
+  acoesHoje: 0,
+  tempoSessao: 0,
+  inicioSessao: Date.now(),
+  historicoAcoes: []
+};
+
+// Rastrear ações do usuário
+function registrarAcao(tipo, detalhes = {}) {
+  try {
+    const acao = {
+      tipo,
+      detalhes,
+      timestamp: Date.now(),
+      usuario: auth.currentUser?.email || 'anonimo',
+      pagina: document.querySelector('.sidebar-item.active')?.textContent?.trim() || 'Dashboard'
+    };
+    
+    analyticsData.acoesHoje++;
+    analyticsData.historicoAcoes.push(acao);
+    
+    // Manter apenas últimas 100 ações
+    if (analyticsData.historicoAcoes.length > 100) {
+      analyticsData.historicoAcoes = analyticsData.historicoAcoes.slice(-100);
+    }
+    
+    // Salvar no localStorage
+    localStorage.setItem('analytics-sessao', JSON.stringify(analyticsData));
+    
+    // Enviar para Firebase (opcional)
+    if (auth.currentUser) {
+      db.collection('analytics').add(acao).catch(() => {});
+    }
+  } catch (e) {}
+}
+window.registrarAcao = registrarAcao;
+
+// Dashboard de Analytics
+function mostrarAnalytics() {
+  try {
+    const tempoSessao = Math.floor((Date.now() - analyticsData.inicioSessao) / 60000); // minutos
+    
+    const ultimasAcoes = analyticsData.historicoAcoes.slice(-10).reverse();
+    
+    const acoesContadas = {};
+    analyticsData.historicoAcoes.forEach(a => {
+      acoesContadas[a.tipo] = (acoesContadas[a.tipo] || 0) + 1;
+    });
+    
+    const topAcoes = Object.entries(acoesContadas)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+    
+    const html = `
+      <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px;" onclick="if(event.target === this) this.remove()">
+        <div style="background: var(--bg-card); border-radius: 16px; width: 100%; max-width: 900px; max-height: 85vh; overflow: hidden; box-shadow: var(--shadow-lg);" onclick="event.stopPropagation()">
+          
+          <div style="padding: 24px; border-bottom: 1px solid var(--border); background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <h3 style="margin: 0; color: white; font-size: 24px; font-weight: 700;">
+              📊 Analytics & Métricas
+            </h3>
+            <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">
+              Acompanhe o uso do sistema em tempo real
+            </p>
+          </div>
+          
+          <div style="padding: 24px; overflow-y: auto; max-height: calc(85vh - 180px);">
+            
+            <!-- Cards de Métricas -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+              
+              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 20px; color: white;">
+                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">⏱️ Tempo de Sessão</div>
+                <div style="font-size: 32px; font-weight: 700;">${tempoSessao}</div>
+                <div style="font-size: 12px; opacity: 0.8;">minutos</div>
+              </div>
+              
+              <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 12px; padding: 20px; color: white;">
+                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">⚡ Ações Hoje</div>
+                <div style="font-size: 32px; font-weight: 700;">${analyticsData.acoesHoje}</div>
+                <div style="font-size: 12px; opacity: 0.8;">interações</div>
+              </div>
+              
+              <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 12px; padding: 20px; color: white;">
+                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">📈 Produtividade</div>
+                <div style="font-size: 32px; font-weight: 700;">${tempoSessao > 0 ? Math.round(analyticsData.acoesHoje / (tempoSessao / 60)) : 0}</div>
+                <div style="font-size: 12px; opacity: 0.8;">ações/hora</div>
+              </div>
+              
+              <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: 12px; padding: 20px; color: white;">
+                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">💾 Produtos</div>
+                <div style="font-size: 32px; font-weight: 700;">${produtos.size}</div>
+                <div style="font-size: 12px; opacity: 0.8;">cadastrados</div>
+              </div>
+              
+            </div>
+            
+            <!-- Top Ações -->
+            <div style="background: var(--bg-secondary); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+              <h4 style="margin: 0 0 16px 0; color: var(--text-primary); font-size: 16px; font-weight: 600;">
+                🏆 Ações Mais Frequentes
+              </h4>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                ${topAcoes.length === 0 ? `
+                  <div style="text-align: center; padding: 20px; color: var(--text-secondary);">
+                    <div style="font-size: 48px; margin-bottom: 12px;">📊</div>
+                    <p>Nenhuma ação registrada ainda</p>
+                  </div>
+                ` : topAcoes.map(([tipo, count], idx) => {
+                  const porcentagem = Math.round((count / analyticsData.acoesHoje) * 100);
+                  const cores = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#feca57'];
+                  return `
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                      <div style="min-width: 32px; height: 32px; background: ${cores[idx]}; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 14px;">
+                        ${idx + 1}
+                      </div>
+                      <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                          <strong style="color: var(--text-primary); font-size: 14px;">${tipo}</strong>
+                          <span style="color: var(--text-secondary); font-size: 13px;">${count}x (${porcentagem}%)</span>
+                        </div>
+                        <div style="height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+                          <div style="height: 100%; background: ${cores[idx]}; width: ${porcentagem}%; transition: width 0.3s;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+            
+            <!-- Histórico Recente -->
+            <div style="background: var(--bg-secondary); border-radius: 12px; padding: 20px;">
+              <h4 style="margin: 0 0 16px 0; color: var(--text-primary); font-size: 16px; font-weight: 600;">
+                🕐 Últimas Atividades
+              </h4>
+              <div style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;">
+                ${ultimasAcoes.length === 0 ? `
+                  <div style="text-align: center; padding: 20px; color: var(--text-secondary);">
+                    <p>Nenhuma atividade recente</p>
+                  </div>
+                ` : ultimasAcoes.map(acao => {
+                  const tempo = new Date(acao.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                  const icones = {
+                    'adicionar': '➕',
+                    'editar': '✏️',
+                    'excluir': '🗑️',
+                    'exportar': '📤',
+                    'importar': '📥',
+                    'buscar': '🔍',
+                    'filtrar': '🔽',
+                    'visualizar': '👁️',
+                    'backup': '💾'
+                  };
+                  const icone = icones[acao.tipo] || '📌';
+                  
+                  return `
+                    <div style="display: flex; align-items: center; gap: 12px; padding: 10px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);">
+                      <div style="font-size: 20px;">${icone}</div>
+                      <div style="flex: 1;">
+                        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">${acao.tipo}</div>
+                        <div style="font-size: 11px; color: var(--text-secondary);">${acao.pagina}</div>
+                      </div>
+                      <div style="font-size: 11px; color: var(--text-secondary); white-space: nowrap;">${tempo}</div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+            
+          </div>
+          
+          <div style="padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary);">
+            <button onclick="window.exportarAnalytics()" class="btn btn-secondary btn-sm">
+              📥 Exportar Dados
+            </button>
+            <button onclick="this.closest('div[style*=\\'position: fixed\\']').remove()" class="btn btn-primary">
+              Fechar
+            </button>
+          </div>
+          
+        </div>
+      </div>
+    `;
+    
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    document.body.appendChild(container.firstElementChild);
+    
+  } catch (e) {
+    console.error('Erro ao mostrar analytics:', e);
+    mostrarToast('⚠️ Erro ao abrir analytics', 'error');
+  }
+}
+window.mostrarAnalytics = mostrarAnalytics;
+
+function exportarAnalytics() {
+  try {
+    const dados = {
+      periodo: 'Sessão Atual',
+      dataExportacao: new Date().toLocaleString('pt-BR'),
+      metricas: {
+        tempoSessao: Math.floor((Date.now() - analyticsData.inicioSessao) / 60000),
+        acoesRealizadas: analyticsData.acoesHoje,
+        produtividade: analyticsData.acoesHoje / ((Date.now() - analyticsData.inicioSessao) / 3600000)
+      },
+      historicoCompleto: analyticsData.historicoAcoes
+    };
+    
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Analytics_FEFO_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    mostrarToast('📊 Analytics exportado!', 'success');
+    registrarAcao('exportar', { tipo: 'analytics' });
+  } catch (e) {
+    mostrarToast('⚠️ Erro ao exportar', 'error');
+  }
+}
+window.exportarAnalytics = exportarAnalytics;
+
+// Carregar analytics do localStorage
+try {
+  const saved = localStorage.getItem('analytics-sessao');
+  if (saved) {
+    const data = JSON.parse(saved);
+    const hoje = new Date().toDateString();
+    const ultimaSessao = new Date(data.inicioSessao).toDateString();
+    
+    if (hoje === ultimaSessao) {
+      analyticsData = { ...analyticsData, ...data, inicioSessao: Date.now() };
+    }
+  }
+} catch (e) {}
+
+// Registrar visita
+analyticsData.visitasHoje++;
+localStorage.setItem('analytics-sessao', JSON.stringify(analyticsData));
