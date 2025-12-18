@@ -3140,11 +3140,11 @@ function mostrarPerfil() {
     secaoPerfil = document.createElement('div');
     secaoPerfil.id = 'secaoPerfil';
     secaoPerfil.className = 'secao';
-    const conteudo = document.getElementById('conteudo');
-    if (conteudo) {
-      conteudo.appendChild(secaoPerfil);
+    const contentWrapper = document.querySelector('.content-wrapper');
+    if (contentWrapper) {
+      contentWrapper.appendChild(secaoPerfil);
     } else {
-      console.error('Elemento conteudo não encontrado');
+      console.error('Elemento content-wrapper não encontrado');
       return;
     }
   }
@@ -3404,8 +3404,8 @@ function mostrarDashboardAdmin() {
     secaoAdmin = document.createElement('div');
     secaoAdmin.id = 'secaoAdmin';
     secaoAdmin.className = 'secao';
-    const conteudo = document.getElementById('conteudo');
-    if (conteudo) conteudo.appendChild(secaoAdmin);
+    const contentWrapper = document.querySelector('.content-wrapper');
+    if (contentWrapper) contentWrapper.appendChild(secaoAdmin);
   }
   
   secaoAdmin.classList.remove('hidden');
