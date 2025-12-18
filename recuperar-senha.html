@@ -196,6 +196,20 @@
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   
+  // Desregistrar service workers antigos
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      registrations.forEach(registration => registration.unregister());
+    });
+  }
+  
+  // Limpar cache do navegador
+  if ('caches' in window) {
+    caches.keys().then(names => {
+      names.forEach(name => caches.delete(name));
+    });
+  }
+  
   function mostrarAlerta(mensagem, tipo) {
     const alert = document.getElementById('alert');
     alert.textContent = mensagem;
