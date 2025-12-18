@@ -270,86 +270,129 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
         console.log('Erro na busca inteligente:', e);
       }
       
-      console.log('4️⃣ Tentando Open Food Facts (API internacional)...');
-      let response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${codigo}.json`);
-      let data = await response.json();
-      console.log('Resposta Open Food Facts:', data);
+      // QUARTO: Tenta múltiplas APIs de produtos
+      console.log('4️⃣ Tentando APIs de produtos...');
       
-      if (data.status === 1 && data.product) {
-        const produto = data.product;
-        const nomeProduto = produto.product_name || produto.product_name_pt || produto.generic_name || '';
-        const marca = produto.brands || '';
+      // API 1: Open Food Facts
+      try {
+        console.log('📡 Tentando Open Food Facts...');
+        let response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${codigo}.json`);
+        let data = await response.json();
         
-        // 🆕 BUSCA INTELIGENTE NO CATÁLOGO ANTES DE PREENCHER
-        if (nomeProduto) {
-          console.log('🧠 Tentando busca inteligente no catálogo...');
-          const produtoInteligente = await buscarProdutoInteligenteNoCatalogo(nomeProduto, marca);
+        if (data.status === 1 && data.product) {
+          const produto = data.product;
+          const nomeProduto = produto.product_name || produto.product_name_pt || produto.generic_name || '';
+          const marca = produto.brands || '';
           
-          if (produtoInteligente) {
-            // ENCONTROU! Preenche com dados do catálogo e associa o código
-            console.log('🎯 MATCH AUTOMÁTICO!', produtoInteligente.nome);
-            document.getElementById('nomeProduto').value = produtoInteligente.nome;
+          if (nomeProduto) {
+            console.log('✅ Open Food Facts encontrou:', nomeProduto);
+            const produtoInteligente = await buscarProdutoInteligenteNoCatalogo(nomeProduto, marca);
             
-            if (produtoInteligente.marca) {
-              document.getElementById('marcaProduto').value = produtoInteligente.marca;
-            }
-            if (produtoInteligente.categoria) {
-              document.getElementById('categoriaProduto').value = produtoInteligente.categoria;
-            }
-            if (produtoInteligente.fornecedor) {
-              document.getElementById('fornecedorProduto').value = produtoInteligente.fornecedor;
+            if (produtoInteligente) {
+              console.log('🎯 MATCH AUTOMÁTICO!', produtoInteligente.nome);
+              document.getElementById('nomeProduto').value = produtoInteligente.nome;
+              if (produtoInteligente.marca) document.getElementById('marcaProduto').value = produtoInteligente.marca;
+              if (produtoInteligente.categoria) document.getElementById('categoriaProduto').value = produtoInteligente.categoria;
+              if (produtoInteligente.fornecedor) document.getElementById('fornecedorProduto').value = produtoInteligente.fornecedor;
+              
+              await db.collection('catalogo-produtos').doc(produtoInteligente.id).update({ codigo });
+              mostrarLoader(false);
+              mostrarToast('✅ Produto encontrado e associado automaticamente!');
+              return;
             }
             
-            // ASSOCIA O CÓDIGO DE BARRAS AO PRODUTO DO CATÁLOGO
-            await db.collection('catalogo-produtos').doc(produtoInteligente.id).update({ codigo });
-            console.log('✅ Código associado ao produto do catálogo!');
-            
+            document.getElementById('nomeProduto').value = nomeProduto;
+            if (marca) document.getElementById('marcaProduto').value = marca;
             mostrarLoader(false);
-            mostrarToast('✅ Produto encontrado e associado automaticamente!');
+            mostrarToast('✅ Produto encontrado na Open Food Facts!');
             return;
           }
         }
-        
-        // Se não encontrou match inteligente, preenche com dados da API
-        if (nomeProduto) {
-          document.getElementById('nomeProduto').value = nomeProduto;
-          console.log('✅ Nome preenchido:', nomeProduto);
-        }
-        
-        if (marca) {
-          const selectMarca = document.getElementById('marcaProduto');
-          // Verifica se a marca existe no select
-          const opcoes = Array.from(selectMarca.options).map(opt => opt.value);
-          
-          // Tenta encontrar a marca (case-insensitive)
-          let marcaEncontrada = opcoes.find(m => m.toLowerCase() === marca.toLowerCase());
-          
-          if (marcaEncontrada) {
-            selectMarca.value = marcaEncontrada;
-            console.log('✅ Marca preenchida:', marcaEncontrada);
-          } else {
-            // Se não existe, sugere adicionar
-            console.log('⚠️ Marca não cadastrada:', marca);
-            if (confirm(`A marca "${marca}" não está cadastrada. Deseja adicionar?`)) {
-              await db.collection('marcas').add({ nome: marca });
-              await carregarMarcas();
-              selectMarca.value = marca;
-              console.log('✅ Marca adicionada e preenchida:', marca);
-            }
-          }
-        }
-        
-        mostrarLoader(false);
-        mostrarToast('✅ Produto encontrado na Open Food Facts!');
-        console.log('✅ Busca concluída com sucesso!');
-        return;
+      } catch (e) {
+        console.log('⚠️ Open Food Facts falhou:', e.message);
       }
       
-      // Se não encontrou na Open Food Facts
-      console.log('❌ Produto não encontrado nas APIs públicas');
+      // API 2: UPC Database
+      try {
+        console.log('📡 Tentando UPC Database...');
+        let response = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${codigo}`);
+        let data = await response.json();
+        
+        if (data.items && data.items.length > 0) {
+          const item = data.items[0];
+          const nomeProduto = item.title || '';
+          const marca = item.brand || '';
+          
+          if (nomeProduto) {
+            console.log('✅ UPC Database encontrou:', nomeProduto);
+            const produtoInteligente = await buscarProdutoInteligenteNoCatalogo(nomeProduto, marca);
+            
+            if (produtoInteligente) {
+              console.log('🎯 MATCH AUTOMÁTICO!', produtoInteligente.nome);
+              document.getElementById('nomeProduto').value = produtoInteligente.nome;
+              if (produtoInteligente.marca) document.getElementById('marcaProduto').value = produtoInteligente.marca;
+              if (produtoInteligente.categoria) document.getElementById('categoriaProduto').value = produtoInteligente.categoria;
+              if (produtoInteligente.fornecedor) document.getElementById('fornecedorProduto').value = produtoInteligente.fornecedor;
+              
+              await db.collection('catalogo-produtos').doc(produtoInteligente.id).update({ codigo });
+              mostrarLoader(false);
+              mostrarToast('✅ Produto encontrado e associado automaticamente!');
+              return;
+            }
+            
+            document.getElementById('nomeProduto').value = nomeProduto;
+            if (marca) document.getElementById('marcaProduto').value = marca;
+            mostrarLoader(false);
+            mostrarToast('✅ Produto encontrado no UPC Database!');
+            return;
+          }
+        }
+      } catch (e) {
+        console.log('⚠️ UPC Database falhou:', e.message);
+      }
+      
+      // API 3: World of EAN
+      try {
+        console.log('📡 Tentando World of EAN...');
+        let response = await fetch(`https://world.openfoodfacts.net/api/v2/product/${codigo}`);
+        let data = await response.json();
+        
+        if (data.product) {
+          const nomeProduto = data.product.product_name || '';
+          const marca = data.product.brands || '';
+          
+          if (nomeProduto) {
+            console.log('✅ World of EAN encontrou:', nomeProduto);
+            const produtoInteligente = await buscarProdutoInteligenteNoCatalogo(nomeProduto, marca);
+            
+            if (produtoInteligente) {
+              console.log('🎯 MATCH AUTOMÁTICO!', produtoInteligente.nome);
+              document.getElementById('nomeProduto').value = produtoInteligente.nome;
+              if (produtoInteligente.marca) document.getElementById('marcaProduto').value = produtoInteligente.marca;
+              if (produtoInteligente.categoria) document.getElementById('categoriaProduto').value = produtoInteligente.categoria;
+              if (produtoInteligente.fornecedor) document.getElementById('fornecedorProduto').value = produtoInteligente.fornecedor;
+              
+              await db.collection('catalogo-produtos').doc(produtoInteligente.id).update({ codigo });
+              mostrarLoader(false);
+              mostrarToast('✅ Produto encontrado e associado automaticamente!');
+              return;
+            }
+            
+            document.getElementById('nomeProduto').value = nomeProduto;
+            if (marca) document.getElementById('marcaProduto').value = marca;
+            mostrarLoader(false);
+            mostrarToast('✅ Produto encontrado no World of EAN!');
+            return;
+          }
+        }
+      } catch (e) {
+        console.log('⚠️ World of EAN falhou:', e.message);
+      }
+      
+      console.log('❌ Produto não encontrado em nenhuma API');
       mostrarLoader(false);
       
-      // 🆕 NOVA FUNCIONALIDADE: Buscar no catálogo e associar código
+      // 🆕 ÚLTIMA TENTATIVA: Buscar no catálogo e associar código
       console.log('🔍 Buscando no catálogo para associar...');
       const resultadoBusca = await buscarNoCatalogoParaAssociar(codigo);
       if (resultadoBusca) {
