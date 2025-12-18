@@ -195,3 +195,38 @@ TOTAL: 100+ produtos!
         alert('❌ Erro ao importar produtos. Verifique o console.');
     }
 }
+
+// Função para verificar quantos produtos estão no catálogo
+async function verificarCatalogo() {
+    if (!db) {
+        alert('Sistema não inicializado. Aguarde e tente novamente.');
+        return;
+    }
+    
+    try {
+        const catalogoRef = firebase.firestore().collection('catalogo-produtos');
+        const snapshot = await catalogoRef.get();
+        
+        // Contar por marca
+        const porMarca = {};
+        snapshot.forEach(doc => {
+            const produto = doc.data();
+            porMarca[produto.marca] = (porMarca[produto.marca] || 0) + 1;
+        });
+        
+        let mensagem = `📊 CATÁLOGO ATUAL\n━━━━━━━━━━━━━━━━━\n`;
+        mensagem += `Total: ${snapshot.size} produtos\n\n`;
+        mensagem += `Por marca:\n`;
+        
+        Object.keys(porMarca).sort().forEach(marca => {
+            mensagem += `• ${marca}: ${porMarca[marca]}\n`;
+        });
+        
+        alert(mensagem);
+        console.log('Catálogo completo:', snapshot.docs.map(d => d.data()));
+        
+    } catch (error) {
+        console.error('Erro ao verificar catálogo:', error);
+        alert('❌ Erro ao verificar catálogo.');
+    }
+}
