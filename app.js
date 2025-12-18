@@ -286,10 +286,15 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       atualizarMetricas();
       mostrarToast('Login realizado com sucesso!', false);
       
-      // Solicita permissão de notificações após 2 segundos
+      // Solicita permissão de notificações e verifica primeiro acesso
       setTimeout(() => {
         solicitarPermissaoNotificacao();
         verificarProdutosVencendo();
+        
+        // Verificar se é primeiro acesso para mostrar tour
+        if (typeof verificarPrimeiroAcesso === 'function') {
+          verificarPrimeiroAcesso();
+        }
       }, 2000);
     } catch (e) { handleError(e); }
   }
