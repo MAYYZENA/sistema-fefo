@@ -7,9 +7,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Sistema FEFO — gerenciamento de estoque profissional">
-<meta name="theme-color" content="#1a73e8">
-<title>Sistema FEFO - Gestão de Estoque</title>
+<meta name="description" content="Sistema FEFO — gerenciamento de estoque com foco em Primeiro a Vencer, Primeiro a Sair">
+<meta name="theme-color" content="#0d6efd">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23667eea' width='100' height='100' rx='20'/><text y='70' font-size='60' x='50' text-anchor='middle' fill='%23fff'>📦</text></svg>">
+<title>GESTÃO FEFO</title>
+
+<!-- Bootstrap -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <!-- FontAwesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -23,169 +27,131 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 <script src="https://unpkg.com/html5-qrcode" defer></script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+
+  <!-- QRCode.js para gerar QR Code de acesso mobile -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+
 </head>
+
 
 <body>
 
-<!-- Loader Global -->
-<div id="global-loader">
-  <div class="spinner"></div>
-</div>
-
-<!-- Toast -->
-<div id="toast" class="toast d-none">
-  <div id="toast-body"></div>
-</div>
-
-<!-- Toast -->
-<div id="toast" class="toast d-none">
-  <div id="toast-body"></div>
-</div>
-
-<!-- ==================== LOGIN ==================== -->
-<section id="login" class="tela">
-  <div class="login-container">
-    <div class="login-logo">
-      <h1>Sistema FEFO</h1>
-      <p>Gestão Profissional de Estoque</p>
+  <a class="skip-link" href="#main">Ir para o conteúdo</a>
+  <div id="toast" class="toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-4" role="alert" aria-live="polite" aria-atomic="true" style="z-index:1080;display:none;min-width:220px">
+    <div class="d-flex">
+      <div class="toast-body" id="toast-body">Ação realizada com sucesso!</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Fechar" onclick="document.getElementById('toast').style.display='none'"></button>
     </div>
-    <form class="login-form" onsubmit="event.preventDefault(); login();">
+  </div>
+
+  <!-- SIDEBAR NAVEGAÇÃO -->
+  <aside class="sidebar d-none" id="sidebar">
+    <div class="sidebar-header">
+      <h3>GESTÃO FEFO</h3>
+      <small style="font-size:11px;opacity:0.7;">Sistema de Estoque</small>
+    </div>
+    <ul class="sidebar-menu">
+      <li><a href="#" onclick="abrir('menu')" class="active"><i class="fas fa-home"></i> Dashboard</a></li>
+      <li><a href="#" onclick="abrir('estoque')"><i class="fas fa-box"></i> Estoque</a></li>
+      <li><a href="#" onclick="abrir('curvaABC')"><i class="fas fa-chart-bar"></i> Curva ABC</a></li>
+      <li><a href="#" onclick="abrir('historico')"><i class="fas fa-history"></i> Histórico</a></li>
+      <li><a href="#" onclick="abrir('locais')"><i class="fas fa-map-marker-alt"></i> Locais</a></li>
+      <li><a href="#" onclick="abrir('usuarios')" id="menuUsuarios"><i class="fas fa-users"></i> Usuários</a></li>
+      <li style="margin-top:auto;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;">
+        <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Sair</a>
+      </li>
+    </ul>
+  </aside>
+
+  <!-- LOGIN (fora do main-content para aparecer antes do login) -->
+  <section id="login" class="tela">
+    <div class="login-card">
+      <h2>GESTÃO FEFO</h2>
+      <p class="text-center text-secondary mb-4">Sistema de Controle de Estoque</p>
       <div class="form-group">
-        <label for="email" class="form-label">E-mail</label>
-        <input id="email" class="form-control" type="email" placeholder="seu@email.com" autocomplete="username" required>
+        <label for="email" class="form-label">Email</label>
+        <input id="email" class="form-control" type="email" placeholder="seu@email.com" autocomplete="username">
       </div>
       <div class="form-group">
         <label for="senha" class="form-label">Senha</label>
-        <input id="senha" type="password" class="form-control" placeholder="Digite sua senha" autocomplete="current-password" required>
+        <input id="senha" type="password" class="form-control" placeholder="••••••••" autocomplete="current-password">
       </div>
-      <button type="submit" class="btn btn-primary btn-lg w-100 mb-2">
-        <i class="fas fa-sign-in-alt"></i>
-        Entrar
+      <button class="btn btn-primary w-100 mb-2" onclick="login()">
+        <i class="fas fa-sign-in-alt"></i> Entrar
       </button>
-      <button type="button" class="btn btn-secondary w-100" onclick="registrar()">
-        <i class="fas fa-user-plus"></i>
-        Criar Nova Conta
+      <button class="btn btn-secondary w-100" onclick="registrar()">
+        <i class="fas fa-user-plus"></i> Criar Conta
       </button>
-    </form>
-  </div>
-</section>
+    </div>
+  </section>
 
-<!-- ==================== SIDEBAR ==================== -->
-<aside class="sidebar d-none" id="sidebar">
-  <div class="sidebar-header">
-    <h2 class="sidebar-logo">Sistema FEFO</h2>
-    <p class="sidebar-subtitle">Gestão de Estoque</p>
-  </div>
-  <ul class="sidebar-nav">
-    <li class="nav-item">
-      <a href="#" onclick="abrir('menu')" class="nav-link active">
-        <i class="fas fa-home"></i>
-        Dashboard
-      </a>
-    </li>
-    <li class="nav-item">
-      <a href="#" onclick="abrir('estoque')" class="nav-link">
-        <i class="fas fa-boxes"></i>
-        Estoque
-      </a>
-    </li>
-    <li class="nav-item">
-      <a href="#" onclick="abrir('curvaABC')" class="nav-link">
-        <i class="fas fa-chart-line"></i>
-        Curva ABC
-      </a>
-    </li>
-    <li class="nav-item">
-      <a href="#" onclick="abrir('historico')" class="nav-link">
-        <i class="fas fa-history"></i>
-        Histórico
-      </a>
-    </li>
-    <li class="nav-item">
-      <a href="#" onclick="abrir('locais')" class="nav-link">
-        <i class="fas fa-map-marker-alt"></i>
-        Locais
-      </a>
-    </li>
-    <li class="nav-item" id="menuUsuarios">
-      <a href="#" onclick="abrir('usuarios')" class="nav-link">
-        <i class="fas fa-users"></i>
-        Usuários
-      </a>
-    </li>
-  </ul>
-  <div class="sidebar-footer">
-    <button class="btn btn-secondary w-100" onclick="logout()">
-      <i class="fas fa-sign-out-alt"></i>
-      Sair
-    </button>
-  </div>
-</aside>
-
-<!-- ==================== MAIN CONTENT ==================== -->
-<div class="main-content d-none" id="mainContent">
-  <div class="topbar">
-    <h1 class="topbar-title" id="pageTitle">Dashboard</h1>
-    <div class="topbar-actions">
-      <div class="user-badge">
-        <i class="fas fa-user-circle"></i>
-        <span id="userName">Usuário</span>
+  <!-- CONTEÚDO PRINCIPAL -->
+  <div class="main-content d-none" id="mainContent">
+    <div class="top-bar">
+      <h2 id="pageTitle">Dashboard</h2>
+      <div class="top-bar-actions">
+        <div class="user-info">
+          <i class="fas fa-user"></i>
+          <span id="userName">Usuário</span>
+        </div>
       </div>
     </div>
-  </div>
-  
-  <div class="content-wrapper">
+    <div class="content-area">
 
-<!-- ==================== DASHBOARD ==================== -->
-<!-- ==================== DASHBOARD ==================== -->
+<!-- MENU/DASHBOARD -->
 <section id="menu" class="tela d-none">
-  
-  <div class="stats-grid">
-    <div class="stat-card primary">
-      <div class="stat-label">Total de Produtos</div>
-      <div class="stat-value" id="totalProdutos">0</div>
+  <div class="dashboard-stats">
+    <div class="stat-card" style="border-left-color: var(--primary);">
+      <p>Total de Produtos</p>
+      <h3 id="totalProdutos">0</h3>
     </div>
-    <div class="stat-card warning">
-      <div class="stat-label">Próximo ao Vencimento</div>
-      <div class="stat-value" id="proxVencer">0</div>
+    <div class="stat-card" style="border-left-color: var(--warning);">
+      <p>Próximo Vencimento</p>
+      <h3 id="proxVencer">0</h3>
     </div>
-    <div class="stat-card danger">
-      <div class="stat-label">Vencidos</div>
-      <div class="stat-value" id="vencidos">0</div>
+    <div class="stat-card" style="border-left-color: var(--danger);">
+      <p>Vencidos</p>
+      <h3 id="vencidos">0</h3>
     </div>
   </div>
 
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title">Ações Rápidas</h3>
+      <h5 class="card-title">Ações Rápidas</h5>
     </div>
     <div class="card-body">
-      <div class="actions-grid">
-        <button class="action-btn" onclick="solicitarPermissaoNotificacao()">
-          <i class="fas fa-bell"></i>
-          <span>Ativar Alertas</span>
-        </button>
-        <button class="action-btn" onclick="fazerBackup()">
-          <i class="fas fa-download"></i>
-          <span>Fazer Backup</span>
-        </button>
-        <button class="action-btn" onclick="compartilharRelatorio('whatsapp')">
-          <i class="fab fa-whatsapp"></i>
-          <span>Enviar WhatsApp</span>
-        </button>
-        <button class="action-btn" onclick="limparDadosAntigos()">
-          <i class="fas fa-trash-alt"></i>
-          <span>Limpar Dados</span>
-        </button>
+      <div class="row">
+        <div class="col-md-3 mb-2">
+          <button class="btn btn-success w-100" onclick="solicitarPermissaoNotificacao()">
+            <i class="fas fa-bell"></i> Ativar Alertas
+          </button>
+        </div>
+        <div class="col-md-3 mb-2">
+          <button class="btn btn-info w-100" onclick="fazerBackup()">
+            <i class="fas fa-download"></i> Backup
+          </button>
+        </div>
+        <div class="col-md-3 mb-2">
+          <button class="btn btn-warning w-100" onclick="compartilharRelatorio('whatsapp')">
+            <i class="fab fa-whatsapp"></i> WhatsApp
+          </button>
+        </div>
+        <div class="col-md-3 mb-2">
+          <button class="btn btn-secondary w-100" onclick="limparDadosAntigos()">
+            <i class="fas fa-broom"></i> Limpar Dados
+          </button>
+        </div>
       </div>
     </div>
   </div>
-
 </section>
 
 <!-- MODAL DE CONFIGURAÇÕES -->

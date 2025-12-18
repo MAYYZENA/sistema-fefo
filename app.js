@@ -145,11 +145,10 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     }
     
     // Atualizar menu ativo
-    document.querySelectorAll('.sidebar-menu a').forEach(link => {
-      link.classList.remove('active');
-    });
-    const activeLink = document.querySelector(`.sidebar-menu a[onclick*="'${id}'"]`);
-    if (activeLink) {
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.classList.remove('active');
+  });
+  const activeLink = document.querySelector(`.nav-link[onclick*="'${id}'"]`);
       activeLink.classList.add('active');
     }
 
@@ -1386,10 +1385,9 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     var body = document.getElementById('toast-body');
     if (!toast || !body) return;
     body.textContent = msg;
-    toast.classList.remove('text-bg-danger','text-bg-success');
-    toast.classList.add(erro ? 'text-bg-danger' : 'text-bg-success');
-    toast.style.display = 'block';
-    setTimeout(() => { toast.style.display = 'none'; }, 3500);
+    toast.className = 'toast ' + (erro ? 'error' : 'success');
+    toast.classList.remove('d-none');
+    setTimeout(() => { toast.classList.add('d-none'); }, 3500);
   }
 
   // ================ GESTÃO DE PRODUTOS ================
