@@ -54,7 +54,9 @@
       <h1>Sistema FEFO</h1>
       <p>Gestão Profissional de Estoque</p>
     </div>
-    <div class="login-form">
+    
+    <!-- Formulário de Login -->
+    <div class="login-form" id="formLogin">
       <div class="form-group">
         <label for="email" class="form-label">E-mail</label>
         <input id="email" class="form-control" type="email" placeholder="seu@email.com" autocomplete="username">
@@ -67,10 +69,37 @@
         <i class="fas fa-sign-in-alt"></i>
         Entrar
       </button>
-      <button type="button" class="btn btn-secondary w-100" onclick="registrar()">
+      <button type="button" class="btn btn-secondary w-100" onclick="mostrarFormRegistro()">
         <i class="fas fa-user-plus"></i>
         Criar Nova Conta
       </button>
+    </div>
+    
+    <!-- Formulário de Registro -->
+    <div class="login-form" id="formRegistro" style="display:none;">
+      <button type="button" class="btn btn-link mb-3" onclick="voltarLogin()" style="padding: 0;">
+        <i class="fas fa-arrow-left"></i> Voltar
+      </button>
+      <h3 style="margin-bottom: 20px;">Criar Nova Conta</h3>
+      <div class="form-group">
+        <label for="nomeEmpresa" class="form-label">Nome da Empresa *</label>
+        <input id="nomeEmpresa" class="form-control" type="text" placeholder="Ex: Farmácia Central" required>
+      </div>
+      <div class="form-group">
+        <label for="emailRegistro" class="form-label">E-mail *</label>
+        <input id="emailRegistro" class="form-control" type="email" placeholder="seu@email.com" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label for="senhaRegistro" class="form-label">Senha *</label>
+        <input id="senhaRegistro" type="password" class="form-control" placeholder="Mínimo 6 caracteres" autocomplete="new-password" required>
+      </div>
+      <button type="button" class="btn btn-success btn-lg w-100" onclick="registrar()">
+        <i class="fas fa-check"></i>
+        Criar Conta Grátis
+      </button>
+      <p style="margin-top: 12px; font-size: 13px; color: #6b7280; text-align: center;">
+        Ao criar uma conta, você concorda com nossos Termos de Uso
+      </p>
     </div>
   </div>
 </section>

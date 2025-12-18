@@ -36,16 +36,16 @@ function verificarProdutosVencendo() {
     console.error('Erro ao carregar configurações:', e);
   }
   
-  if (!alertaNavegador) return;
+  if (!alertaNavegador || !auth.currentUser) return;
   
   const agora = new Date();
   const dataLimite = new Date(agora.getTime() + diasAlerta * 24 * 60 * 60 * 1000);
   
-  db.collection('estoque').get().then(snap => {
+  getCollection('estoque').get().then(snap => {
     snap.docs.forEach(doc => {
       const p = doc.data();
-      if (p.validade && p.validade.toDate) {
-        const dataValidade = p.validade.toDate();
+      if (p.dataValidade && p.dataValidade.toDate) {
+        const dataValidade = p.dataValidade.toDate();
         if (dataValidade > agora && dataValidade <= dataLimite) {
           if ('Notification' in window && Notification.permission === 'granted') {
             new Notification('⚠️ Produto próximo do vencimento!', {
@@ -104,6 +104,18 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     } else {
       alert('Abra o console do Firebase → Firestore → Rules e cole o seguinte:\n\n' + rules);
     }
+  }
+
+  let usuarioAtual = null;
+  let empresaAtual = null;
+
+  // Função auxiliar para obter caminho da coleção isolada por usuário
+  function getCollection(collectionName) {
+    if (!auth.currentUser) {
+      console.error('Usuário não autenticado');
+      throw new Error('Usuário não autenticado');
+    }
+    return db.collection('usuarios').doc(auth.currentUser.uid).collection(collectionName);
   }
 
   // ================ CONTROLE DE TELAS ================
@@ -219,7 +231,30 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       const email = document.getElementById('email').value;
       const senha = document.getElementById('senha').value;
       if (!email || !senha) { mostrarToast('Preencha email e senha', true); return; }
-      await auth.signInWithEmailAndPassword(email, senha);
+      
+      const userCredential = await auth.signInWithEmailAndPassword(email, senha);
+      const user = userCredential.user;
+      
+      // Carregar dados da empresa
+      const empresaDoc = await db.collection('usuarios').doc(user.uid).get();
+      if (empresaDoc.exists) {
+        empresaAtual = empresaDoc.data();
+        usuarioAtual = {
+          uid: user.uid,
+          email: user.email,
+          ...empresaAtual
+        };
+      } else {
+        // Primeira vez - criar perfil básico
+        empresaAtual = {
+          nomeEmpresa: email.split('@')[0],
+          email: email,
+          dataCriacao: firebase.firestore.FieldValue.serverTimestamp(),
+          plano: 'gratuito'
+        };
+        await db.collection('usuarios').doc(user.uid).set(empresaAtual);
+        usuarioAtual = { uid: user.uid, email: user.email, ...empresaAtual };
+      }
       
       // Esconder login
       document.getElementById('login').style.display = 'none';
@@ -230,7 +265,12 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       if (sidebar) sidebar.classList.remove('d-none');
       if (mainContent) mainContent.classList.remove('d-none');
       
+      // Atualizar nome do usuário no header
+      const userName = document.getElementById('userName');
+      if (userName) userName.textContent = empresaAtual.nomeEmpresa || email;
+      
       abrir('menu');
+      atualizarMetricas();
       mostrarToast('Login realizado com sucesso!', false);
       
       // Solicita permissão de notificações após 2 segundos
@@ -243,13 +283,69 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
 
   async function registrar() {
     try {
-      const email = document.getElementById('email').value;
-      const senha = document.getElementById('senha').value;
-      if (!email || !senha) { alert('Preencha email e senha'); return; }
-      await auth.createUserWithEmailAndPassword(email, senha);
-      alert('Usuário criado com sucesso');
-    } catch (e) { handleError(e); }
+      const email = document.getElementById('emailRegistro').value;
+      const senha = document.getElementById('senhaRegistro').value;
+      const nomeEmpresa = document.getElementById('nomeEmpresa').value;
+      
+      if (!email || !senha || !nomeEmpresa) { 
+        mostrarToast('Preencha todos os campos obrigatórios', true); 
+        return; 
+      }
+      
+      if (senha.length < 6) {
+        mostrarToast('A senha deve ter no mínimo 6 caracteres', true);
+        return;
+      }
+      
+      mostrarLoader(true);
+      
+      const userCredential = await auth.createUserWithEmailAndPassword(email, senha);
+      const user = userCredential.user;
+      
+      // Criar perfil da empresa
+      await db.collection('usuarios').doc(user.uid).set({
+        nomeEmpresa: nomeEmpresa,
+        email: email,
+        dataCriacao: firebase.firestore.FieldValue.serverTimestamp(),
+        plano: 'gratuito',
+        ativo: true
+      });
+      
+      mostrarLoader(false);
+      mostrarToast('✅ Conta criada com sucesso! Faça login para continuar.', false);
+      voltarLogin();
+      
+      // Limpar campos
+      document.getElementById('emailRegistro').value = '';
+      document.getElementById('senhaRegistro').value = '';
+      document.getElementById('nomeEmpresa').value = '';
+      
+    } catch (e) { 
+      mostrarLoader(false);
+      if (e.code === 'auth/email-already-in-use') {
+        mostrarToast('Este e-mail já está cadastrado', true);
+      } else if (e.code === 'auth/invalid-email') {
+        mostrarToast('E-mail inválido', true);
+      } else if (e.code === 'auth/weak-password') {
+        mostrarToast('Senha muito fraca', true);
+      } else {
+        handleError(e); 
+      }
+    }
   }
+  
+  function mostrarFormRegistro() {
+    document.getElementById('formLogin').style.display = 'none';
+    document.getElementById('formRegistro').style.display = 'block';
+  }
+  
+  function voltarLogin() {
+    document.getElementById('formLogin').style.display = 'block';
+    document.getElementById('formRegistro').style.display = 'none';
+  }
+  
+  window.mostrarFormRegistro = mostrarFormRegistro;
+  window.voltarLogin = voltarLogin;
 
   function logout() { 
     auth.signOut();
@@ -270,7 +366,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       if (!select || !filtro) return;
       select.innerHTML = `<option value="">Selecione a marca</option>`;
       filtro.innerHTML = `<option value="">Todas as marcas</option>`;
-      const snap = await db.collection('marcas').orderBy('nome').get();
+      const snap = await getCollection('marcas').orderBy('nome').get();
       snap.forEach(doc => {
         const nome = doc.data().nome;
         select.innerHTML += `<option value="${nome}">${nome}</option>`;
@@ -299,7 +395,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       // PRIMEIRO: Busca no seu próprio estoque
       console.log('1️⃣ Buscando no estoque local...');
       try {
-        const estoqueSnap = await db.collection('estoque').where('codigo', '==', codigo).limit(1).get();
+        const estoqueSnap = await getCollection('estoque').where('codigo', '==', codigo).limit(1).get();
         if (!estoqueSnap.empty) {
           const produtoExistente = estoqueSnap.docs[0].data();
           console.log('✅ Produto encontrado no estoque:', produtoExistente);
@@ -763,9 +859,9 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       
       if (produtoEditando) {
         // ATUALIZA produto existente
-        await db.collection('estoque').doc(produtoEditando).update(dadosProduto);
+        await getCollection('estoque').doc(produtoEditando).update(dadosProduto);
         
-        await db.collection('historico').add({
+        await getCollection('historico').add({
           tipo: 'edição',
           produto: nome,
           descricao: `Produto editado - ${nome}`,
@@ -779,9 +875,9 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       } else {
         // ADICIONA novo produto
         dadosProduto.criadoEm = firebase.firestore.FieldValue.serverTimestamp();
-        const docRef = await db.collection('estoque').add(dadosProduto);
+        const docRef = await getCollection('estoque').add(dadosProduto);
         
-        await db.collection('historico').add({
+        await getCollection('historico').add({
           tipo: 'entrada',
           produtoId: docRef.id,
           produto: nome,
@@ -808,7 +904,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       dadosEstoque = [];
       const tabela = document.getElementById('tabelaEstoque'); if (!tabela) { mostrarLoader(false); return; }
       tabela.innerHTML = '';
-      const snap = await db.collection('estoque').orderBy('validade','asc').get();
+      const snap = await getCollection('estoque').orderBy('validade','asc').get();
       snap.forEach(doc => {
         const p = doc.data();
         p.id = doc.id; // Adiciona ID do documento para edição/exclusão
@@ -1420,10 +1516,10 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   async function excluirProduto(id) {
     if (!confirm('⚠️ Tem certeza que deseja excluir este produto?')) return;
     try {
-      await db.collection('estoque').doc(id).delete();
+      await getCollection('estoque').doc(id).delete();
       
       // Registra no histórico
-      await db.collection('historico').add({
+      await getCollection('historico').add({
         tipo: 'exclusão',
         descricao: 'Produto excluído do estoque',
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
@@ -1439,7 +1535,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   
   async function ajustarQuantidade(id, ajuste) {
     try {
-      const doc = await db.collection('estoque').doc(id).get();
+      const doc = await getCollection('estoque').doc(id).get();
       if (!doc.exists) {
         mostrarToast('Produto não encontrado', true);
         return;
@@ -1453,10 +1549,10 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
         return;
       }
       
-      await db.collection('estoque').doc(id).update({ quantidade: novaQtd });
+      await getCollection('estoque').doc(id).update({ quantidade: novaQtd });
       
       // Registra no histórico
-      await db.collection('historico').add({
+      await getCollection('historico').add({
         tipo: ajuste > 0 ? 'entrada' : 'saída',
         produto: produto.nome,
         quantidade: Math.abs(ajuste),
@@ -1476,7 +1572,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   
   async function editarProduto(id) {
     try {
-      const doc = await db.collection('estoque').doc(id).get();
+      const doc = await getCollection('estoque').doc(id).get();
       if (!doc.exists) {
         mostrarToast('Produto não encontrado', true);
         return;
@@ -1527,12 +1623,12 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
     if (!confirm('⚠️ Tem certeza que deseja excluir este produto?')) return;
     try {
       mostrarLoader(true);
-      const doc = await db.collection('estoque').doc(id).get();
+      const doc = await getCollection('estoque').doc(id).get();
       const produto = doc.data();
       
-      await db.collection('estoque').doc(id).delete();
+      await getCollection('estoque').doc(id).delete();
       
-      await db.collection('historico').add({
+      await getCollection('historico').add({
         tipo: 'exclusão',
         produto: produto.nome,
         descricao: `Produto excluído - ${produto.nome}`,
@@ -1553,7 +1649,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
   async function ajustarQuantidade(id, ajuste) {
     try {
       mostrarLoader(true);
-      const doc = await db.collection('estoque').doc(id).get();
+      const doc = await getCollection('estoque').doc(id).get();
       if (!doc.exists) {
         mostrarLoader(false);
         mostrarToast('Produto não encontrado', true);
@@ -1569,9 +1665,9 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
         return;
       }
       
-      await db.collection('estoque').doc(id).update({ quantidade: novaQtd });
+      await getCollection('estoque').doc(id).update({ quantidade: novaQtd });
       
-      await db.collection('historico').add({
+      await getCollection('historico').add({
         tipo: ajuste > 0 ? 'entrada' : 'saída',
         produto: produto.nome,
         quantidade: Math.abs(ajuste),
@@ -1606,8 +1702,8 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
       const tbody = document.getElementById('tabelaCurvaABCBody');
       tbody.innerHTML = '<tr><td colspan="4" class="text-center">Carregando...</td></tr>';
       
-      const snap = await db.collection('estoque').get();
-      const snapHistorico = await db.collection('historico').get();
+      const snap = await getCollection('estoque').get();
+      const snapHistorico = await getCollection('historico').get();
       
       let produtos = [];
       let movimentacoes = {};
@@ -1958,7 +2054,7 @@ setInterval(verificarProdutosVencendo, 6 * 60 * 60 * 1000);
 // ================ DASHBOARD METRICS (fora da IIFE) ================
 window.atualizarMetricas = async function() {
   try {
-    const snap = await db.collection('estoque').get();
+    const snap = await getCollection('estoque').get();
     let total = 0;
     let proxVencer = 0;
     let vencidos = 0;
@@ -2004,7 +2100,7 @@ auth.onAuthStateChanged(user => {
 async function carregarGraficosEvolucao() {
   try {
     // Busca estoque atual para simular evolução
-    const snap = await db.collection('estoque').get();
+    const snap = await getCollection('estoque').get();
     
     // Calcula quantidade total atual
     let quantidadeTotal = 0;
@@ -2158,7 +2254,7 @@ async function carregarHistorico() {
     if (!tabela) { mostrarLoader(false); return; }
     tabela.innerHTML = '';
     
-    const snap = await db.collection('historico').orderBy('timestamp', 'desc').limit(50).get();
+    const snap = await getCollection('historico').orderBy('timestamp', 'desc').limit(50).get();
     
     snap.forEach(doc => {
       const h = doc.data();
@@ -2261,7 +2357,7 @@ async function migrarCatalogoParaEstoque() {
         console.log(`🔍 Processando: ${produto.nome}`);
         
         // Verifica se já existe no estoque pelo NOME e MARCA
-        const estoqueSnap = await db.collection('estoque')
+        const estoqueSnap = await getCollection('estoque')
           .where('nome', '==', produto.nome)
           .where('marca', '==', produto.marca)
           .limit(1)
@@ -2274,7 +2370,7 @@ async function migrarCatalogoParaEstoque() {
         }
         
         // Adiciona ao estoque com quantidade 0
-        await db.collection('estoque').add({
+        await getCollection('estoque').add({
           codigo: produto.codigo || '',
           nome: produto.nome || '',
           marca: produto.marca || '',
@@ -2403,7 +2499,7 @@ async function compartilharRelatorio(tipo) {
   
   try {
     // Gerar dados do relatório
-    const snapshot = await db.collection('estoque').get();
+    const snapshot = await getCollection('estoque').get();
     
     const produtos = [];
     snapshot.forEach(doc => {
@@ -2475,19 +2571,19 @@ async function fazerBackup() {
     };
     
     // Buscar estoque
-    const snapshotEstoque = await db.collection('estoque').get();
+    const snapshotEstoque = await getCollection('estoque').get();
     snapshotEstoque.forEach(doc => {
       backup.dados.estoque.push({ id: doc.id, ...doc.data() });
     });
     
     // Buscar histórico
-    const snapshotHistorico = await db.collection('historico').get();
+    const snapshotHistorico = await getCollection('historico').get();
     snapshotHistorico.forEach(doc => {
       backup.dados.historico.push({ id: doc.id, ...doc.data() });
     });
     
     // Buscar locais
-    const snapshotLocais = await db.collection('locais').get();
+    const snapshotLocais = await getCollection('locais').get();
     snapshotLocais.forEach(doc => {
       backup.dados.locais.push({ id: doc.id, ...doc.data() });
     });
@@ -2643,7 +2739,7 @@ async function carregarLocais() {
     
     select.innerHTML = '<option value="">📍 Local (opcional)</option>';
     
-    const snapshot = await db.collection('locais').get();
+    const snapshot = await getCollection('locais').get();
     
     if (snapshot.empty) {
       console.log('Nenhum local cadastrado ainda');
@@ -2685,14 +2781,14 @@ async function adicionarLocal() {
     mostrarLoader(true);
     
     // Verifica se já existe
-    const existe = await db.collection('locais').where('nome', '==', nome).get();
+    const existe = await getCollection('locais').where('nome', '==', nome).get();
     if (!existe.empty) {
       alert('⚠️ Esse local já está cadastrado!');
       mostrarLoader(false);
       return;
     }
     
-    await db.collection('locais').add({
+    await getCollection('locais').add({
       nome,
       descricao,
       criadoEm: firebase.firestore.FieldValue.serverTimestamp()
@@ -2717,7 +2813,7 @@ async function listarLocais() {
     const container = document.getElementById('listaLocais');
     if (!container) return;
     
-    const snapshot = await db.collection('locais').get();
+    const snapshot = await getCollection('locais').get();
     
     if (snapshot.empty) {
       container.innerHTML = '<p class="text-muted">Nenhum local cadastrado.</p>';
@@ -2762,7 +2858,7 @@ async function excluirLocal(id, nome) {
   
   try {
     mostrarLoader(true);
-    await db.collection('locais').doc(id).delete();
+    await getCollection('locais').doc(id).delete();
     mostrarLoader(false);
     mostrarToast('✅ Local excluído!');
     listarLocais();
