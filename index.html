@@ -329,9 +329,9 @@
       <label for="nomeProduto" class="visually-hidden">Produto</label>
       <input id="nomeProduto" class="form-control mb-2" placeholder="Produto" autocomplete="off" aria-label="Nome do produto" tabindex="9">
       <label for="marcaProduto" class="visually-hidden">Marca</label>
-      <select id="marcaProduto" class="form-select mb-2" disabled aria-label="Marca do produto" tabindex="10">
-      <option value="">Selecione a marca</option>
-      </select>
+      <input id="marcaProduto" list="listaMarcas" class="form-control mb-2" placeholder="Marca" autocomplete="off" aria-label="Marca do produto" tabindex="10">
+      <datalist id="listaMarcas">
+      </datalist>
       <label for="loteProduto" class="visually-hidden">Lote</label>
       <input id="loteProduto" class="form-control mb-2" placeholder="Lote (opcional)" autocomplete="off" aria-label="Lote" tabindex="10">
       <label for="fornecedorProduto" class="visually-hidden">Fornecedor</label>

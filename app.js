@@ -380,18 +380,19 @@ function getCollection(collectionName) {
   // ================ MARCAS (FIRESTORE) ================
   async function carregarMarcas() {
     try {
-      const select = document.getElementById('marcaProduto');
+      const datalist = document.getElementById('listaMarcas');
       const filtro = document.getElementById('filtroMarca');
-      if (!select || !filtro) return;
-      select.innerHTML = `<option value="">Selecione a marca</option>`;
-      filtro.innerHTML = `<option value="">Todas as marcas</option>`;
+      if (!datalist) return;
+      
+      datalist.innerHTML = '';
+      if (filtro) filtro.innerHTML = `<option value="">Todas as marcas</option>`;
+      
       const snap = await getCollection('marcas').orderBy('nome').get();
       snap.forEach(doc => {
         const nome = doc.data().nome;
-        select.innerHTML += `<option value="${nome}">${nome}</option>`;
-        filtro.innerHTML += `<option value="${nome}">${nome}</option>`;
+        datalist.innerHTML += `<option value="${nome}">`;
+        if (filtro) filtro.innerHTML += `<option value="${nome}">${nome}</option>`;
       });
-      select.disabled = false;
     } catch (e) { handleError(e); }
   }
 
@@ -2335,23 +2336,21 @@ function voltar() {
 
 // ================= MARCAS (FIRESTORE) =================
 async function carregarMarcas() {
-  const select = document.getElementById("marcaProduto");
+  const datalist = document.getElementById("listaMarcas");
   const filtro = document.getElementById("filtroMarca");
 
-  if (!select || !filtro) return;
+  if (!datalist) return;
 
-  select.innerHTML = `<option value="">Selecione a marca</option>`;
-  filtro.innerHTML = `<option value="">Todas as marcas</option>`;
+  datalist.innerHTML = '';
+  if (filtro) filtro.innerHTML = `<option value="">Todas as marcas</option>`;
 
   const snap = await db.collection("marcas").orderBy("nome").get();
 
   snap.forEach(doc => {
     const nome = doc.data().nome;
-    select.innerHTML += `<option value="${nome}">${nome}</option>`;
-    filtro.innerHTML += `<option value="${nome}">${nome}</option>`;
+    datalist.innerHTML += `<option value="${nome}">`;
+    if (filtro) filtro.innerHTML += `<option value="${nome}">${nome}</option>`;
   });
-
-  select.disabled = false;
 }
 
 // ================= 🆕 MIGRAR CATÁLOGO PARA ESTOQUE =================
