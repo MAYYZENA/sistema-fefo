@@ -3,13 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <title>Recuperar Senha - Sistema FEFO</title>
-  <link rel="stylesheet" href="vendor/bootstrap.min.css?v=2.0">
+  <title>Redefinir Senha - Sistema FEFO</title>
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css" crossorigin="anonymous">
-  <link rel="stylesheet" href="style.css?v=2.0">
+  <link rel="stylesheet" href="style.css">
   <style>
     body {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -20,7 +17,7 @@
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
-    .card-recuperar {
+    .card-redefinir {
       background: white;
       border-radius: 16px;
       padding: 40px;
@@ -29,13 +26,13 @@
       box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     }
     
-    .card-recuperar h1 {
+    .card-redefinir h1 {
       font-size: 28px;
       margin-bottom: 12px;
       color: #1976d2;
     }
     
-    .card-recuperar p {
+    .card-redefinir p {
       color: #666;
       margin-bottom: 30px;
     }
@@ -88,16 +85,6 @@
       box-shadow: 0 8px 20px rgba(25, 118, 210, 0.3);
     }
     
-    .btn-secondary {
-      background: #f5f5f5;
-      color: #666;
-      margin-top: 12px;
-    }
-    
-    .btn-secondary:hover {
-      background: #e0e0e0;
-    }
-    
     .alert {
       padding: 12px 16px;
       border-radius: 8px;
@@ -137,44 +124,66 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    
+    .senha-requisitos {
+      font-size: 13px;
+      color: #666;
+      margin-top: 8px;
+      padding-left: 20px;
+    }
+    
+    .senha-requisitos li {
+      margin: 4px 0;
+    }
   </style>
 </head>
 <body>
 
-<div class="card-recuperar">
-  <h1><i class="fas fa-key"></i> Recuperar Senha</h1>
-  <p>Digite seu email e enviaremos instruções para redefinir sua senha.</p>
+<div class="card-redefinir">
+  <h1><i class="fas fa-lock"></i> Redefinir Senha</h1>
+  <p>Digite sua nova senha abaixo.</p>
   
   <div id="alert" class="alert"></div>
   
-  <form id="formRecuperar" onsubmit="return false;">
+  <form id="formRedefinir" onsubmit="return false;">
     <div class="form-group">
-      <label for="emailRecuperar" class="form-label">
-        <i class="fas fa-envelope"></i> Email Cadastrado
+      <label for="novaSenha" class="form-label">
+        <i class="fas fa-key"></i> Nova Senha
       </label>
       <input 
-        id="emailRecuperar" 
+        id="novaSenha" 
         class="form-control" 
-        type="email" 
-        placeholder="seu@email.com"
-        required
-        autocomplete="email">
+        type="password" 
+        placeholder="Mínimo 8 caracteres"
+        required>
+      <ul class="senha-requisitos">
+        <li>✓ Mínimo 8 caracteres</li>
+        <li>✓ Letras e números</li>
+        <li>✓ Recomendado: caracteres especiais</li>
+      </ul>
     </div>
     
-    <button type="button" onclick="enviarRecuperacao()" class="btn btn-primary">
-      <i class="fas fa-paper-plane"></i>
-      Enviar Link de Recuperação
-    </button>
+    <div class="form-group">
+      <label for="confirmarSenha" class="form-label">
+        <i class="fas fa-check"></i> Confirmar Senha
+      </label>
+      <input 
+        id="confirmarSenha" 
+        class="form-control" 
+        type="password" 
+        placeholder="Digite a senha novamente"
+        required>
+    </div>
     
-    <button type="button" onclick="voltarLogin()" class="btn btn-secondary">
-      <i class="fas fa-arrow-left"></i>
-      Voltar para Login
+    <button type="button" onclick="redefinirSenha()" class="btn btn-primary">
+      <i class="fas fa-save"></i>
+      Redefinir Senha
     </button>
   </form>
   
   <div id="loader" class="loader">
     <div class="spinner"></div>
-    <p style="margin-top: 12px; color: #666;">Enviando...</p>
+    <p style="margin-top: 12px; color: #666;">Salvando...</p>
   </div>
 </div>
 
@@ -183,7 +192,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
 <script>
-  // Configuração do Firebase (mesma do app.js)
+  // Configuração do Firebase
   const firebaseConfig = {
     apiKey: "AIzaSyA3YHP6mxbtHjdfzhfEiIoEONnGyXnEvAg",
     authDomain: "gestao-fefo.firebaseapp.com",
@@ -195,6 +204,17 @@
   
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
+  
+  // Pegar código do URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const oobCode = urlParams.get('oobCode');
+  const mode = urlParams.get('mode');
+  
+  // Verificar se é link válido
+  if (!oobCode || mode !== 'resetPassword') {
+    mostrarAlerta('❌ Link inválido ou expirado. Solicite um novo link de recuperação.', 'error');
+    document.getElementById('formRedefinir').style.display = 'none';
+  }
   
   function mostrarAlerta(mensagem, tipo) {
     const alert = document.getElementById('alert');
@@ -208,90 +228,68 @@
   }
   
   function mostrarLoader(show) {
-    document.getElementById('formRecuperar').style.display = show ? 'none' : 'block';
+    document.getElementById('formRedefinir').style.display = show ? 'none' : 'block';
     document.getElementById('loader').style.display = show ? 'block' : 'none';
   }
   
-  async function enviarRecuperacao() {
-    const email = document.getElementById('emailRecuperar').value.trim();
+  async function redefinirSenha() {
+    const novaSenha = document.getElementById('novaSenha').value;
+    const confirmarSenha = document.getElementById('confirmarSenha').value;
     
-    // Validar email
-    if (!email) {
-      mostrarAlerta('⚠️ Digite seu email', 'error');
+    // Validações
+    if (!novaSenha || !confirmarSenha) {
+      mostrarAlerta('⚠️ Preencha todos os campos', 'error');
       return;
     }
     
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      mostrarAlerta('⚠️ Email inválido', 'error');
+    if (novaSenha.length < 8) {
+      mostrarAlerta('⚠️ A senha deve ter no mínimo 8 caracteres', 'error');
+      return;
+    }
+    
+    if (novaSenha !== confirmarSenha) {
+      mostrarAlerta('⚠️ As senhas não coincidem', 'error');
+      return;
+    }
+    
+    // Verificar força da senha
+    const temLetra = /[a-zA-Z]/.test(novaSenha);
+    const temNumero = /\d/.test(novaSenha);
+    
+    if (!temLetra || !temNumero) {
+      mostrarAlerta('⚠️ A senha deve conter letras e números', 'error');
       return;
     }
     
     try {
       mostrarLoader(true);
       
-      // Configurar URL de redirecionamento
-      const actionCodeSettings = {
-        url: 'https://mayyzena.github.io/sistema-fefo/redefinir-senha.html',
-        handleCodeInApp: false
-      };
-      
-      // Enviar email de recuperação
-      await auth.sendPasswordResetEmail(email, actionCodeSettings);
+      // Confirmar código e redefinir senha
+      await auth.confirmPasswordReset(oobCode, novaSenha);
       
       mostrarLoader(false);
-      mostrarAlerta('✅ Email de recuperação enviado com sucesso!\n\n📧 Verifique sua caixa de entrada (e spam).\n\n⏱️ Redirecionando em 5 segundos...', 'success');
+      mostrarAlerta('✅ Senha redefinida com sucesso!\n\n⏱️ Redirecionando para login...', 'success');
       
-      // Limpar campo
-      document.getElementById('emailRecuperar').value = '';
-      
-      // Desabilitar botão para evitar reenvios
-      const btnEnviar = document.querySelector('button[onclick="enviarRecuperacao()"]');
-      if (btnEnviar) {
-        btnEnviar.disabled = true;
-        btnEnviar.style.opacity = '0.5';
-      }
-      
-      // Redirecionar após 5 segundos
-      let countdown = 5;
-      const alertDiv = document.getElementById('alert');
-      const interval = setInterval(() => {
-        countdown--;
-        if (countdown > 0) {
-          alertDiv.textContent = `✅ Email enviado! Redirecionando em ${countdown}s...`;
-        } else {
-          clearInterval(interval);
-          window.location.href = 'index.html';
-        }
-      }, 1000);
+      // Redirecionar após 3 segundos
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 3000);
       
     } catch (error) {
       mostrarLoader(false);
       console.error('Erro:', error);
       
-      if (error.code === 'auth/user-not-found') {
-        // Por segurança, não revelar se email existe ou não
-        mostrarAlerta('✅ Se este email estiver cadastrado, você receberá instruções de recuperação.', 'success');
-      } else if (error.code === 'auth/invalid-email') {
-        mostrarAlerta('❌ Email inválido', 'error');
-      } else if (error.code === 'auth/too-many-requests') {
-        mostrarAlerta('❌ Muitas tentativas. Aguarde alguns minutos.', 'error');
+      if (error.code === 'auth/expired-action-code') {
+        mostrarAlerta('❌ Link expirado. Solicite um novo link de recuperação.', 'error');
+      } else if (error.code === 'auth/invalid-action-code') {
+        mostrarAlerta('❌ Link inválido ou já utilizado.', 'error');
+      } else if (error.code === 'auth/weak-password') {
+        mostrarAlerta('❌ Senha muito fraca. Use no mínimo 8 caracteres.', 'error');
       } else {
-        mostrarAlerta('❌ Erro ao enviar email. Tente novamente.', 'error');
+        mostrarAlerta('❌ Erro ao redefinir senha. Tente novamente.', 'error');
       }
     }
   }
-  
-  function voltarLogin() {
-    window.location.href = 'index.html';
-  }
-  
-  // Enter para enviar
-  document.getElementById('emailRecuperar').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      enviarRecuperacao();
-    }
-  });
 </script>
 
 </body>
