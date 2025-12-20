@@ -6,38 +6,38 @@
 }
 
 :root {
-  --primary: #1a73e8;
-  --primary-dark: #1557b0;
-  --secondary: #5f6368;
-  --success: #1e8e3e;
-  --danger: #d93025;
-  --warning: #f9ab00;
-  --info: #1967d2;
-  
-  --bg-main: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-card: #ffffff;
-  
-  --text-primary: #202124;
-  --text-secondary: #5f6368;
-  --text-disabled: #9aa0a6;
-  
-  --border: #dadce0;
-  --border-light: #e8eaed;
-  
-  --sidebar-bg: #202124;
-  --sidebar-hover: #2d2e30;
-  
-  --shadow-sm: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
-  --shadow-md: 0 1px 3px 0 rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15);
-  --shadow-lg: 0 2px 6px 2px rgba(60,64,67,.3), 0 8px 16px 4px rgba(60,64,67,.15);
-  
+  --primary: #a259f7;
+  --primary-dark: #6d28d9;
+  --secondary: #ff9800;
+  --success: #ffb300;
+  --danger: #ff1744;
+  --warning: #ff9100;
+  --info: #ff6d00;
+
+  --bg-main: #f3e8ff;
+  --bg-secondary: #fbe9e7;
+  --bg-card: #fff3e0;
+
+  --text-primary: #3d0066;
+  --text-secondary: #ff9800;
+  --text-disabled: #b39ddb;
+
+  --border: #ce93d8;
+  --border-light: #f3e5f5;
+
+  --sidebar-bg: #6d28d9;
+  --sidebar-hover: #a259f7;
+
+  --shadow-sm: 0 1px 2px 0 rgba(162,89,247,.3), 0 1px 3px 1px rgba(255,152,0,.15);
+  --shadow-md: 0 1px 3px 0 rgba(162,89,247,.3), 0 4px 8px 3px rgba(255,152,0,.15);
+  --shadow-lg: 0 2px 6px 2px rgba(162,89,247,.3), 0 8px 16px 4px rgba(255,152,0,.15);
+
   --radius: 8px;
   --radius-lg: 12px;
-  
+
   /* Acessibilidade - Focus */
-  --focus-ring: 0 0 0 3px rgba(26, 115, 232, 0.3);
-  --focus-ring-danger: 0 0 0 3px rgba(217, 48, 37, 0.3);
+  --focus-ring: 0 0 0 3px rgba(162, 89, 247, 0.3);
+  --focus-ring-danger: 0 0 0 3px rgba(255, 23, 68, 0.3);
 }
 
 /* ==================== ACESSIBILIDADE ==================== */
@@ -114,19 +114,19 @@ textarea:focus-visible {
 
 /* ==================== MODO ESCURO ==================== */
 body.dark {
-  --bg-main: #1a1a1a;
-  --bg-secondary: #121212;
-  --bg-card: #1e1e1e;
-  
-  --text-primary: #e8eaed;
-  --text-secondary: #9aa0a6;
-  --text-disabled: #5f6368;
-  
-  --border: #3c4043;
-  --border-light: #2d2e30;
-  
-  --sidebar-bg: #0d0d0d;
-  --sidebar-hover: #1f1f1f;
+  --bg-main: #2a004f;
+  --bg-secondary: #3d0066;
+  --bg-card: #4a148c;
+
+  --text-primary: #ffb300;
+  --text-secondary: #ff9100;
+  --text-disabled: #b39ddb;
+
+  --border: #a259f7;
+  --border-light: #6d28d9;
+
+  --sidebar-bg: #3d0066;
+  --sidebar-hover: #a259f7;
 }
 
 body.dark .card {
