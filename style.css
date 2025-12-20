@@ -6,31 +6,32 @@
 }
 
 :root {
-  --primary: #a259f7;
-  --primary-dark: #6d28d9;
-  --secondary: #ff9800;
-  --success: #ffb300;
-  --danger: #ff1744;
-  --warning: #ff9100;
-  --info: #ff6d00;
 
-  --bg-main: #f3e8ff;
-  --bg-secondary: #fbe9e7;
-  --bg-card: #fff3e0;
+  --primary: #d32f2f;
+  --primary-dark: #b71c1c;
+  --secondary: #212121;
+  --success: #d32f2f;
+  --danger: #b71c1c;
+  --warning: #ff5252;
+  --info: #ff1744;
 
-  --text-primary: #3d0066;
-  --text-secondary: #ff9800;
-  --text-disabled: #b39ddb;
+  --bg-main: #111111;
+  --bg-secondary: #1a1a1a;
+  --bg-card: #222222;
 
-  --border: #ce93d8;
-  --border-light: #f3e5f5;
+  --text-primary: #ff5252;
+  --text-secondary: #d32f2f;
+  --text-disabled: #757575;
 
-  --sidebar-bg: #6d28d9;
-  --sidebar-hover: #a259f7;
+  --border: #d32f2f;
+  --border-light: #ff5252;
 
-  --shadow-sm: 0 1px 2px 0 rgba(162,89,247,.3), 0 1px 3px 1px rgba(255,152,0,.15);
-  --shadow-md: 0 1px 3px 0 rgba(162,89,247,.3), 0 4px 8px 3px rgba(255,152,0,.15);
-  --shadow-lg: 0 2px 6px 2px rgba(162,89,247,.3), 0 8px 16px 4px rgba(255,152,0,.15);
+  --sidebar-bg: #b71c1c;
+  --sidebar-hover: #d32f2f;
+
+  --shadow-sm: 0 1px 2px 0 rgba(211,47,47,.3), 0 1px 3px 1px rgba(33,33,33,.15);
+  --shadow-md: 0 1px 3px 0 rgba(211,47,47,.3), 0 4px 8px 3px rgba(33,33,33,.15);
+  --shadow-lg: 0 2px 6px 2px rgba(211,47,47,.3), 0 8px 16px 4px rgba(33,33,33,.15);
 
   --radius: 8px;
   --radius-lg: 12px;
@@ -114,19 +115,19 @@ textarea:focus-visible {
 
 /* ==================== MODO ESCURO ==================== */
 body.dark {
-  --bg-main: #2a004f;
-  --bg-secondary: #3d0066;
-  --bg-card: #4a148c;
+  --bg-main: #000000;
+  --bg-secondary: #111111;
+  --bg-card: #1a1a1a;
 
-  --text-primary: #ffb300;
-  --text-secondary: #ff9100;
-  --text-disabled: #b39ddb;
+  --text-primary: #ff5252;
+  --text-secondary: #d32f2f;
+  --text-disabled: #757575;
 
-  --border: #a259f7;
-  --border-light: #6d28d9;
+  --border: #d32f2f;
+  --border-light: #ff5252;
 
-  --sidebar-bg: #3d0066;
-  --sidebar-hover: #a259f7;
+  --sidebar-bg: #b71c1c;
+  --sidebar-hover: #d32f2f;
 }
 
 body.dark .card {
